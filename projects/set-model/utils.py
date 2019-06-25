@@ -35,15 +35,15 @@ class Dataset():
                                                            train=True,
                                                            transform=transforms.ToTensor(), 
                                                            download=True)
-            datastats_mean = tempset.data.float().mean().item()/255
-            datastats_std = tempset.data.float().std().item()/255
+            self.stats_mean = (tempset.data.float().mean().item()/255, )
+            self.stats_std = (tempset.data.float().std().item()/255, )
             del tempset
 
         # set up transformations
         transform = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.Normalize((datastats_mean,), (datastats_std,)),
+                transforms.Normalize(self.stats_mean, self.stats_std),
             ]
         )
 

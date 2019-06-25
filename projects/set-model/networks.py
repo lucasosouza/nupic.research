@@ -1,4 +1,5 @@
 from torch import nn
+import torch
 
 class MLP(nn.Module):
 
@@ -17,6 +18,7 @@ class MLP(nn.Module):
         )
         defaults.update(config)
         self.__dict__.update(defaults)
+        self.device = torch.device(self.device)
 
         layers = []
         layers.extend(self.linear_block(
@@ -45,7 +47,7 @@ class MLP(nn.Module):
         return block
 
     def forward(self, x):
-        return self.classifier(x.view(-1, self.input_size))
+        return self.classifier(x.view(-1, self.input_size).to(self.device))
 
     def _initialize_weights(self, bias):
         for m in self.modules():
