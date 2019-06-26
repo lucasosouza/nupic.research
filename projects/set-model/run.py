@@ -7,13 +7,13 @@ import os
 config = dict(
     network='MLP',
     num_classes=10,
-    hidden_sizes=[1000,1000,1000],
-    batch_norm=True,
-    dropout=True,
-    bias=False,
+    hidden_sizes=[4000,1000,4000],
+    batch_norm=False,
+    dropout=0.3,
+    bias=True,
     init_weights=True,
     # model=tune.grid_search(['BaseModel', 'SparseModel', 'SET_zero', 'SET_sameDist']),
-    model=tune.grid_search(['BaseModel', 'SparseModel', 'SET_zero']),
+    model=tune.grid_search(['SET_zero', 'SET_faster']),
     # model='SET_zero',
     dataset_name='CIFAR10',
     input_size=3072, # 784, 
@@ -29,14 +29,14 @@ config = dict(
 ray.init()
 tune.run(
     Trainable,
-    name='SET_local_test',
-    num_samples=2,
+    name='SET_optimization',
+    num_samples=1,
     local_dir=os.path.expanduser('~/nta/results'),
     config=config,
     checkpoint_freq=0,
     checkpoint_at_end=False,
     stop={"training_iteration": 1000},
-    resources_per_trial={"cpu": 1, "gpu": 0.15}
+    resources_per_trial={"cpu": 1, "gpu": 0.50}
 )
 
 """"

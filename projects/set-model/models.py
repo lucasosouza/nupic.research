@@ -9,7 +9,8 @@ class BaseModel():
 
         defaults = dict(
             optim_alg='SGD', 
-            device='cpu', 
+            device='cpu',
+            debug_sparse=False
         )
         defaults.update(config)
         self.__dict__.update(defaults)
@@ -18,14 +19,13 @@ class BaseModel():
         self.device = torch.device(self.device)
         self.network = network.to(self.device)
 
-    def setup(self, init_weights=True):
+    def setup(self):
 
         # init optimizer
         if self.optim_alg == 'Adam':
             self.optimizer = optim.Adam(self.network.parameters(), lr=1e-4)
         elif self.optim_alg == 'SGD':
-            self.optimizer = optim.SGD(self.network.parameters(), lr=1e-2, 
-                                       weight_decay=2e-4, momentum=0.9)
+            self.optimizer = optim.SGD(self.network.parameters(), lr=1e-2, momentum=0.9)
         # init loss function
         self.loss_func = nn.CrossEntropyLoss()
 
@@ -78,30 +78,84 @@ class BaseModel():
     def restore(self):
         pass
 
+class TestModel(BaseModel):
+
+    def run_epoch(self, dataset):
+        self.log={}
+        self._run_one_pass(dataset.train_loader, train=True)
+        self._run_one_pass(dataset.test_loader, train=False)
+        return self.log
+
+    def _run_one_pass(self, loader, train=True):
+        """
+        Explicitly remove dropout
+        """
+        epoch_loss = 0
+        num_samples = 0
+        correct = 0
+        for data in loader:
+            # get inputs and label
+            inputs, targets = data
+            targets = targets.to(self.device)
+
+            # zero gradients
+            if train:
+                self.optimizer.zero_grad()
+
+            # forward + backward + optimize
+            if train:
+                outputs = self.network(inputs)
+            else:
+                outputs = self.network(inputs, set_dropout=False)
+            correct += (targets == torch.max(outputs, dim=1)[1]).sum().item()
+            loss = self.loss_func(outputs, targets)
+            if train:
+                loss.backward()
+                self.optimizer.step()
+
+            # keep track of loss
+            epoch_loss += loss.item()
+            num_samples += inputs.shape[0]
+
+        # store loss and acc at each pass
+        loss = (epoch_loss / num_samples) * 1000
+        acc = correct / num_samples
+        if train:
+            self.log['train_loss'] = loss
+            self.log['train_acc'] = acc
+        else:
+            self.log['val_loss'] = loss
+            self.log['val_acc'] = acc
+
+
 
 class SparseModel(BaseModel):
 
-    def setup(self, init_weights=True, epsilon=20):
-        super(SparseModel, self).setup(init_weights)
+    def setup(self, epsilon=20):
+        super(SparseModel, self).setup()
 
-        # calculate sparsity masks
-        self.masks = []
-        self.denseness = []
-        self.num_params = [] # added for paper implementation
-        linear_layers = [m for m in self.network.modules() if isinstance(m, nn.Linear)]
-        # don't need a mask for the last layer
-        for layer in linear_layers[:-1]:
-            shape = layer.weight.shape
-            on_perc = epsilon * np.sum(shape)/np.prod(shape)
-            mask = (torch.rand(shape) < on_perc).float().to(self.device)
-            layer.weight = torch.nn.Parameter(layer.weight * mask)
-            self.masks.append(mask)
-            self.denseness.append(on_perc)
-            self.num_params.append(torch.sum(mask).item())
+        with torch.no_grad():
+            # calculate sparsity masks
+            self.masks = []
+            self.denseness = []
+            self.num_params = [] # added for paper implementation
+
+            # define which layers to skip
+            # first and last, most probably
+            # self.start_sparse:self.end
+
+            for m in list(self.network.modules())[:-1]:
+                if isinstance(m, nn.Linear):
+                    shape = m.weight.shape
+                    on_perc = epsilon * np.sum(shape)/np.prod(shape)
+                    mask = (torch.rand(shape) < on_perc).float().to(self.device)
+                    m.weight.data *= mask
+                    self.masks.append(mask)
+                    self.denseness.append(on_perc)
+                    self.num_params.append(torch.sum(mask).item())
 
     def _run_one_pass(self, loader, train):
         """ TODO: reimplement by calling super and passing a hook """ 
-
 
         epoch_loss = 0
         num_samples = 0
@@ -146,7 +200,6 @@ class SparseModel(BaseModel):
             self._log_sparse_levels()
 
     def _log_sparse_levels(self):
-        self.log['sparse_levels'] = []
         layers = iter(range(len(self.masks)))
         with torch.no_grad():
             for m in self.network.modules():
@@ -155,14 +208,67 @@ class SparseModel(BaseModel):
                     if idx is not None: 
                         zeros = torch.sum((m.weight == 0).int()).item()
                         size = np.prod(m.weight.shape)
-                        self.log['sparse_levels'].append((1- zeros/size))
+                        self.log['sparse_levels_l' + str(idx+1)] = 1- zeros/size
+
+class SET_faster(SparseModel):
+
+    def _run_one_pass(self, loader, train):
+        super(SET_faster, self)._run_one_pass(loader, train)
+        if train:
+            self.reinitialize_weights()
+
+    def prune(self, A, num_params, zeta=0.3):
+        """ Calculate new weights based on SET approach 
+            A vectorized version aimed at keeping the mask with the similar level of sparsity 
+
+        """
+        with torch.no_grad():
+
+            # NOTE: another approach is counting how many numbers to prune (see old model)
+            # calculate thresholds and decay weak connections
+            A_pos = A[A>0]
+            pos_threshold, _ = torch.kthvalue(A_pos, int(zeta*len(A_pos)))
+            A_neg = A[A<0]
+            neg_threshold, _ = torch.kthvalue(A_neg, int((1-zeta)*len(A_neg)))
+            prune_mask = ((A >= pos_threshold) | (A <= neg_threshold)).to(self.device)
+
+            # change mask to add new weights
+            num_add = num_params - torch.sum(prune_mask).item()
+            current_sparsity = torch.sum(A==0).item()
+            p_add = num_add / current_sparsity
+            P = torch.rand(A.shape).to(self.device) < p_add        
+            new_mask = prune_mask | (P & (A==0))
+
+        return new_mask, prune_mask
+
+    def reinitialize_weights(self):        
+        """ Reinitialize weights """
+
+        layers = iter(range(len(self.masks)))
+        for m in self.network.modules():
+            if isinstance(m, nn.Linear):
+                idx = next(layers, None)
+                if idx is not None:
+                    layer_weights = m.weight.clone().detach()                
+                    new_mask, prune_mask = self.prune(layer_weights, self.num_params[idx])
+                    with torch.no_grad():
+                        self.masks[idx] = new_mask.float()
+                        m.weight.data *= prune_mask.float()
+                        # keep track of mean and std of weights
+                        self.log['layer_' + str(idx) + '_mean'] = torch.mean(m.weight).item()
+                        self.log['layer_' + str(idx) + '_std'] = torch.std(m.weight).item()
+
+        # keep track of mask sizes when debugging
+        if self.debug_sparse:
+            for idx, m in enumerate(self.masks):    
+                self.log['mask_sizes_l' + str(idx+1)] = torch.sum(m).item()
+
 
 class SET_zero(SparseModel):
 
 
     def find_first_pos(self, tensor, value):
-        with torch.no_grad():
-            idx = torch.argmin(torch.abs(tensor-value)).item()
+        idx = torch.argmin(torch.abs(tensor-value)).item()
         return idx
 
     def find_last_pos(self, tensor, value):
@@ -171,11 +277,10 @@ class SET_zero(SparseModel):
         [1] https://discuss.pytorch.org/t/how-to-reverse-a-torch-tensor/382
 
         """
-        with torch.no_grad():
-            idx = [i for i in range(tensor.size(0)-1, -1, -1)]
-            idx = torch.LongTensor(idx).to(self.device)
-            inv_tensor = tensor.index_select(0, idx)
-            idx = torch.argmin(torch.abs(inv_tensor-value)).item()
+        idx = [i for i in range(tensor.size(0)-1, -1, -1)]
+        idx = torch.LongTensor(idx).to(self.device)
+        inv_tensor = tensor.index_select(0, idx)
+        idx = torch.argmin(torch.abs(inv_tensor-value)).item()
         return tensor.shape[0] - idx
 
     def _run_one_pass(self, loader, train):
@@ -231,16 +336,21 @@ class SET_zero(SparseModel):
         for m in self.network.modules():
             if isinstance(m, nn.Linear):
                 idx = next(layers, None)
-                if idx is not None:                
-                    new_mask, prune_mask = self.prune(m.weight, self.num_params[idx])
+                if idx is not None:
+                    layer_weights = m.weight.clone().detach()                
+                    new_mask, prune_mask = self.prune(layer_weights, self.num_params[idx])
                     with torch.no_grad():
                         self.masks[idx] = new_mask.float()
-                        m.weight = torch.nn.Parameter(m.weight * prune_mask.float())
+                        m.weight.data *= prune_mask.float()
                         # keep track of mean and std of weights
                         self.log['layer_' + str(idx) + '_mean'] = torch.mean(m.weight).item()
                         self.log['layer_' + str(idx) + '_std'] = torch.std(m.weight).item()
 
         # keep track of mask sizes when debugging
         if self.debug_sparse:
-            with torch.no_grad():    
-                self.log['mask_sizes'] = [torch.sum(m).item() for m in self.masks]
+            for idx, m in enumerate(self.masks):    
+                self.log['mask_sizes_l' + str(idx+1)] = torch.sum(m).item()
+
+
+
+

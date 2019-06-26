@@ -7,8 +7,7 @@ import networks
 
 import os
 import torch
-# torch.manual_seed(32) # run diverse samples
-
+torch.manual_seed(32) # run diverse samples
 
 class Dataset():
 
