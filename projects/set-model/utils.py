@@ -21,6 +21,7 @@ class Dataset():
             batch_size_test=128, 
             stats_mean=None, 
             stats_std=None,
+            augment_images=False,
         )
         defaults.update(config)
         self.__dict__.update(defaults)
@@ -32,25 +33,30 @@ class Dataset():
         if not self.stats_mean or not self.stats_std:
             tempset = getattr(datasets, self.dataset_name)(root=self.data_dir, 
                                                            train=True,
-                                                           transform=transforms.ToTensor(), 
-                                                           download=True)
+                                                           transform=transforms.ToTensor()) 
             self.stats_mean = (tempset.data.float().mean().item()/255, )
             self.stats_std = (tempset.data.float().std().item()/255, )
             del tempset
 
         # set up transformations
-        transform = transforms.Compose(
-            [
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(self.stats_mean, self.stats_std),
+        ])
+        if not self.augment_images:
+            aug_transform = transform
+        else:
+            aug_transform = transforms.Compose([
+                transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),                
                 transforms.ToTensor(),
                 transforms.Normalize(self.stats_mean, self.stats_std),
-            ]
-        )
+            ])
 
         # load train set
         train_set = getattr(datasets, self.dataset_name)(root=self.data_dir, 
                                                          train=True,
-                                                         transform=transform, 
-                                                         download=True)
+                                                         transform=aug_transform)
         self.train_loader = DataLoader(dataset=train_set, 
                                        batch_size=self.batch_size_train, 
                                        shuffle=True)
@@ -58,11 +64,11 @@ class Dataset():
         # load test set
         test_set = getattr(datasets, self.dataset_name)(root=self.data_dir, 
                                                         train=False,
-                                                        transform=transform, 
-                                                        download=True)
+                                                        transform=transform)
         self.test_loader = DataLoader(dataset=test_set, 
                                       batch_size=self.batch_size_test, 
                                       shuffle=False)
+
 
 class Trainable(tune.Trainable):
     """
@@ -89,6 +95,9 @@ class Trainable(tune.Trainable):
     def _restore(self, checkpoint):
         self.model.restore(checkpoint)
 
+def download_dataset(config):
+    getattr(datasets, config['dataset_name'])(
+    download=True, root=os.path.expanduser(config['data_dir']))
 
 
 

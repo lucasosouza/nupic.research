@@ -1,5 +1,19 @@
 from torch import nn
 import torch
+from torchvision import models
+
+
+def vgg19_bn(config):
+    model = models.vgg19_bn()
+    # remove all fc layers, replace for a single fc layer - from 143mi to 20mi parameters
+    model.classifier = nn.Linear(7*7*512, config['num_classes'])
+    return model
+
+def resnet18(config):
+    return models.resnet18(num_classes=config['num_classes'])
+
+def resnet50(config):
+    return models.resnet50(num_classes=config['num_classes'])
 
 class CNN(nn.Module):
 
@@ -46,7 +60,7 @@ class CNN(nn.Module):
         return block
 
     def forward(self, x):
-        return self.classifier(x.view(-1, self.input_size).to(self.device))
+        return self.classifier(x.view(-1, self.input_size))
 
     def _initialize_weights(self, bias):
         for m in self.modules():
@@ -108,7 +122,7 @@ class MLP(nn.Module):
         return block
 
     def forward(self, x):
-        return self.classifier(x.view(-1, self.input_size).to(self.device))
+        return self.classifier(x.view(-1, self.input_size))
 
     def _initialize_weights(self, bias):
         for m in self.modules():
@@ -166,7 +180,7 @@ class CustomMLP(nn.Module):
         return nn.Sequential(*block)
 
     def forward(self, x, set_dropout=True):
-        x = x.view(-1, self.input_size).to(self.device)
+        x = x.view(-1, self.input_size)
         x = self.conv1(x)
         if set_dropout: x = self.dropout_layer(x)
         x = self.conv2(x)
@@ -231,7 +245,7 @@ class RegularMLP(nn.Module):
         return nn.Sequential(*block)
 
     def forward(self, x, set_dropout=True):
-        x = x.view(-1, self.input_size).to(self.device)
+        x = x.view(-1, self.input_size)
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
