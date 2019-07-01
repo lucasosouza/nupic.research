@@ -26,15 +26,16 @@ from io import BytesIO
 
 import matplotlib.pyplot as plt
 import numpy as np
-from ray.tune.logger import Logger, JsonLogger, CSVLogger
+from ray.tune.logger import CSVLogger, JsonLogger, Logger
 from ray.tune.result import TIME_TOTAL_S, TIMESTEPS_TOTAL, TRAINING_ITERATION
 
 logger = logging.getLogger(__name__)
 
+
 def to_tf_values(result, path, histo_bins=1000):
-    """
-    Adapted from [1], generate a list of tf.Summary.Value() objects that Tensorboard
-    will display under scalars, images, histograms, & distributions tabs.
+    """Adapted from [1], generate a list of tf.Summary.Value() objects that
+    Tensorboard will display under scalars, images, histograms, & distributions
+    tabs.
 
     We manually generate the summary objects from raw data passed from tune via the logger.
 
@@ -42,7 +43,7 @@ def to_tf_values(result, path, histo_bins=1000):
         * Scalar (any prefix, already supported by TFLogger)
         * Image ("img_" prefix)
         * Histograms ("hist_" prefix)
-    
+
     [1] https://gist.github.com/gyglim/1f8dfb1b5c82627ae3efcfbbadb9f514#file-tensorboard_logging-py-L41  # noqa
     """
     values = []
@@ -107,12 +108,11 @@ def to_tf_values(result, path, histo_bins=1000):
 
 
 class TFLoggerPlus(Logger):
-    """
-    Tensorboard logger that supports histograms and images based on
-    key prefixes 'hist_' and 'img_'.
+    """Tensorboard logger that supports histograms and images based on key
+    prefixes 'hist_' and 'img_'.
 
-    Pass instead of TFLogger e.g.
-    tune.run(..., loggers=(JsonLogger, CSVLogger, TFLoggerPlus))
+    Pass instead of TFLogger e.g. tune.run(..., loggers=(JsonLogger,
+    CSVLogger, TFLoggerPlus))
     """
 
     def _init(self):

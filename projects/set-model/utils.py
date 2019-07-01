@@ -19,89 +19,93 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
+import os
 
 from ray import tune
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
+
 import models
 import networks
 
-import os
-import torch
 
-class Dataset():
-    """ 
-    Loads a dataset. Returns object with a pytorch train and test loader 
-    """ 
-    def __init__(self,  config=None):
+class Dataset:
+    """Loads a dataset.
+
+    Returns object with a pytorch train and test loader
+    """
+
+    def __init__(self, config=None):
 
         defaults = dict(
-            dataset_name=None, 
-            data_dir=None, 
-            batch_size_train=128, 
-            batch_size_test=128, 
-            stats_mean=None, 
+            dataset_name=None,
+            data_dir=None,
+            batch_size_train=128,
+            batch_size_test=128,
+            stats_mean=None,
             stats_std=None,
             augment_images=False,
         )
         defaults.update(config)
         self.__dict__.update(defaults)
 
-        # expand ~ 
+        # expand ~
         self.data_dir = os.path.expanduser(self.data_dir)
 
         # recover mean and std to normalize dataset
         if not self.stats_mean or not self.stats_std:
-            tempset = getattr(datasets, self.dataset_name)(root=self.data_dir, 
-                                                           train=True,
-                                                           transform=transforms.ToTensor()) 
-            self.stats_mean = (tempset.data.float().mean().item()/255, )
-            self.stats_std = (tempset.data.float().std().item()/255, )
+            tempset = getattr(datasets, self.dataset_name)(
+                root=self.data_dir, train=True, transform=transforms.ToTensor()
+            )
+            self.stats_mean = (tempset.data.float().mean().item() / 255,)
+            self.stats_std = (tempset.data.float().std().item() / 255,)
             del tempset
 
         # set up transformations
-        transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(self.stats_mean, self.stats_std),
-        ])
+        transform = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Normalize(self.stats_mean, self.stats_std),
+            ]
+        )
         if not self.augment_images:
             aug_transform = transform
         else:
-            aug_transform = transforms.Compose([
-                transforms.RandomCrop(32, padding=4),
-                transforms.RandomHorizontalFlip(),                
-                transforms.ToTensor(),
-                transforms.Normalize(self.stats_mean, self.stats_std),
-            ])
+            aug_transform = transforms.Compose(
+                [
+                    transforms.RandomCrop(32, padding=4),
+                    transforms.RandomHorizontalFlip(),
+                    transforms.ToTensor(),
+                    transforms.Normalize(self.stats_mean, self.stats_std),
+                ]
+            )
 
         # load train set
-        train_set = getattr(datasets, self.dataset_name)(root=self.data_dir, 
-                                                         train=True,
-                                                         transform=aug_transform)
-        self.train_loader = DataLoader(dataset=train_set, 
-                                       batch_size=self.batch_size_train, 
-                                       shuffle=True)
-    
+        train_set = getattr(datasets, self.dataset_name)(
+            root=self.data_dir, train=True, transform=aug_transform
+        )
+        self.train_loader = DataLoader(
+            dataset=train_set, batch_size=self.batch_size_train, shuffle=True
+        )
+
         # load test set
-        test_set = getattr(datasets, self.dataset_name)(root=self.data_dir, 
-                                                        train=False,
-                                                        transform=transform)
-        self.test_loader = DataLoader(dataset=test_set, 
-                                      batch_size=self.batch_size_test, 
-                                      shuffle=False)
+        test_set = getattr(datasets, self.dataset_name)(
+            root=self.data_dir, train=False, transform=transform
+        )
+        self.test_loader = DataLoader(
+            dataset=test_set, batch_size=self.batch_size_test, shuffle=False
+        )
 
 
 class Trainable(tune.Trainable):
-    """
-    ray.tune trainable generic class
-    Adaptable to any pytorch module
-    """
+    """ray.tune trainable generic class Adaptable to any pytorch module."""
+
     def __init__(self, config=None, logger_creator=None):
         tune.Trainable.__init__(self, config=config, logger_creator=logger_creator)
 
     def _setup(self, config):
-        network = getattr(networks, config['network'])(config=config)
-        self.model = getattr(models, config['model'])(network, config=config)
+        network = getattr(networks, config["network"])(config=config)
+        self.model = getattr(models, config["model"])(network, config=config)
         self.dataset = Dataset(config=config)
         self.model.setup()
 
@@ -115,14 +119,13 @@ class Trainable(tune.Trainable):
     def _restore(self, checkpoint):
         self.model.restore(checkpoint)
 
-def download_dataset(config): 
-    """ Pre-downloads dataset. Required to avoid multiple simultaneous attempts to download same dataset """
-    getattr(datasets, config['dataset_name'])(
-    download=True, root=os.path.expanduser(config['data_dir']))
 
+def download_dataset(config):
+    """Pre-downloads dataset.
 
-
-
-
-
-
+    Required to avoid multiple simultaneous attempts to download same
+    dataset
+    """
+    getattr(datasets, config["dataset_name"])(
+        download=True, root=os.path.expanduser(config["data_dir"])
+    )

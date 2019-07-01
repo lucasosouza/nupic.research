@@ -19,107 +19,78 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from torch import nn
 import torch
+from torch import nn
 from torchvision import models
+
 
 def vgg19_bn(config):
     model = models.vgg19_bn()
-    # remove all fc layers, replace for a single fc layer - from 143mi to 20mi parameters
-    model.classifier = nn.Linear(7*7*512, config['num_classes'])
+    # remove all fc layers, replace for a single fc layer, from 143mi to 20mi parameters
+    model.classifier = nn.Linear(7 * 7 * 512, config["num_classes"])
     return model
 
+
 def resnet18(config):
-    return models.resnet18(num_classes=config['num_classes'])
+    return models.resnet18(num_classes=config["num_classes"])
+
 
 def resnet50(config):
-    return models.resnet50(num_classes=config['num_classes'])
+    return models.resnet50(num_classes=config["num_classes"])
 
-class CNN(nn.Module):
-
-    def __init__(self, config={}):
-
-        super(MLP, self).__init__()
-
-        defaults = dict(
-            input_size=784, 
-            num_classes=10, 
-            hidden_sizes=[4000, 1000, 4000], 
-            batch_norm=False, 
-            dropout=0.3, 
-            bias=False, 
-            init_weights=True, 
-        )
-        defaults.update(config)
-        self.__dict__.update(defaults)
-        self.device = torch.device(self.device)
-
-        layers = []
-        layers.extend(self.linear_block(
-            self.input_size, self.hidden_sizes[0], bn=self.batch_norm, dropout=self.dropout, bias=self.bias))
-        layers.extend(self.linear_block(
-            self.hidden_sizes[0], self.hidden_sizes[1], bn=self.batch_norm, dropout=self.dropout, bias=self.bias))
-        layers.extend(self.linear_block(
-            self.hidden_sizes[1], self.hidden_sizes[2], bn=self.batch_norm, dropout=self.dropout, bias=self.bias))
-        
-        # output layer
-        layers.append(nn.Linear(self.hidden_sizes[2], self.num_classes, bias=self.bias))
-        self.classifier = nn.Sequential(*layers)
-
-        if self.init_weights:
-            self._initialize_weights(self.bias)
-
-    @staticmethod
-    def linear_block(a, b, bn=False, dropout=False, bias=True):
-        block = [nn.Linear(a, b, bias=bias), nn.ReLU()]
-        if bn:
-            block.append(nn.BatchNorm1d(b))
-        if dropout:
-            block.append(nn.Dropout(p=dropout))
-
-        return block
-
-    def forward(self, x):
-        return self.classifier(x.view(-1, self.input_size))
-
-    def _initialize_weights(self, bias):
-        for m in self.modules():
-            if isinstance(m, nn.BatchNorm1d):
-                nn.init.constant_(m.weight, 1)
-                if bias:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight)
-                if bias:
-                    nn.init.constant_(m.bias, 0)
 
 class MLP(nn.Module):
+    """
+    Simple 3 hidden layers + output MLP, similar to one used in SET Paper.
+    """
 
-    def __init__(self, config={}):
-
+    def __init__(self, config=None):
         super(MLP, self).__init__()
 
         defaults = dict(
-            input_size=784, 
-            num_classes=10, 
-            hidden_sizes=[4000, 1000, 4000], 
-            batch_norm=False, 
-            dropout=0.3, 
-            bias=False, 
-            init_weights=True, 
+            input_size=784,
+            num_classes=10,
+            hidden_sizes=[4000, 1000, 4000],
+            batch_norm=False,
+            dropout=0.3,
+            bias=False,
+            init_weights=True,
         )
+        if config is None:
+            config = {}
         defaults.update(config)
         self.__dict__.update(defaults)
         self.device = torch.device(self.device)
 
         layers = []
-        layers.extend(self.linear_block(
-            self.input_size, self.hidden_sizes[0], bn=self.batch_norm, dropout=self.dropout, bias=self.bias))
-        layers.extend(self.linear_block(
-            self.hidden_sizes[0], self.hidden_sizes[1], bn=self.batch_norm, dropout=self.dropout, bias=self.bias))
-        layers.extend(self.linear_block(
-            self.hidden_sizes[1], self.hidden_sizes[2], bn=self.batch_norm, dropout=self.dropout, bias=self.bias))
-        
+        layers.extend(
+            self.linear_block(
+                self.input_size,
+                self.hidden_sizes[0],
+                bn=self.batch_norm,
+                dropout=self.dropout,
+                bias=self.bias,
+            )
+        )
+        layers.extend(
+            self.linear_block(
+                self.hidden_sizes[0],
+                self.hidden_sizes[1],
+                bn=self.batch_norm,
+                dropout=self.dropout,
+                bias=self.bias,
+            )
+        )
+        layers.extend(
+            self.linear_block(
+                self.hidden_sizes[1],
+                self.hidden_sizes[2],
+                bn=self.batch_norm,
+                dropout=self.dropout,
+                bias=self.bias,
+            )
+        )
+
         # output layer
         layers.append(nn.Linear(self.hidden_sizes[2], self.num_classes, bias=self.bias))
         self.classifier = nn.Sequential(*layers)
@@ -150,4 +121,3 @@ class MLP(nn.Module):
                 nn.init.xavier_uniform_(m.weight)
                 if bias:
                     nn.init.constant_(m.bias, 0)
-

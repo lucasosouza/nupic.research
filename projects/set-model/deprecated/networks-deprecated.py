@@ -125,3 +125,88 @@ class RegularMLP(nn.Module):
                 nn.init.xavier_uniform_(m.weight) # regular xavier initialization
                 if bias:
                     nn.init.constant_(m.bias, 0)
+
+
+
+class CNN(nn.Module):
+    """ 
+    Simple implementenation of CNN
+    """
+
+    def __init__(self, config={}):
+
+        super(MLP, self).__init__()
+
+        defaults = dict(
+            input_size=784,
+            num_classes=10,
+            hidden_sizes=[4000, 1000, 4000],
+            batch_norm=False,
+            dropout=0.3,
+            bias=False,
+            init_weights=True,
+        )
+        defaults.update(config)
+        self.__dict__.update(defaults)
+        self.device = torch.device(self.device)
+
+        layers = []
+        layers.extend(
+            self.linear_block(
+                self.input_size,
+                self.hidden_sizes[0],
+                bn=self.batch_norm,
+                dropout=self.dropout,
+                bias=self.bias,
+            )
+        )
+        layers.extend(
+            self.linear_block(
+                self.hidden_sizes[0],
+                self.hidden_sizes[1],
+                bn=self.batch_norm,
+                dropout=self.dropout,
+                bias=self.bias,
+            )
+        )
+        layers.extend(
+            self.linear_block(
+                self.hidden_sizes[1],
+                self.hidden_sizes[2],
+                bn=self.batch_norm,
+                dropout=self.dropout,
+                bias=self.bias,
+            )
+        )
+
+        # output layer
+        layers.append(nn.Linear(self.hidden_sizes[2], self.num_classes, bias=self.bias))
+        self.classifier = nn.Sequential(*layers)
+
+        if self.init_weights:
+            self._initialize_weights(self.bias)
+
+    @staticmethod
+    def linear_block(a, b, bn=False, dropout=False, bias=True):
+        block = [nn.Linear(a, b, bias=bias), nn.ReLU()]
+        if bn:
+            block.append(nn.BatchNorm1d(b))
+        if dropout:
+            block.append(nn.Dropout(p=dropout))
+
+        return block
+
+    def forward(self, x):
+        return self.classifier(x.view(-1, self.input_size))
+
+    def _initialize_weights(self, bias):
+        for m in self.modules():
+            if isinstance(m, nn.BatchNorm1d):
+                nn.init.constant_(m.weight, 1)
+                if bias:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                if bias:
+                    nn.init.constant_(m.bias, 0)
+

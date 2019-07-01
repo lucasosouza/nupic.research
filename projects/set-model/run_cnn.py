@@ -19,43 +19,45 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from utils import Trainable, download_dataset
+import os
+
 import ray
 import ray.tune as tune
-import os
 import torch
-from loggers import DEFAULT_LOGGERS
 
-torch.manual_seed(32) # run diverse samples
+from loggers import DEFAULT_LOGGERS
+from utils import Trainable, download_dataset
+
+torch.manual_seed(32)  # run diverse samples
 
 # alternative initialization based on configuration
 exp_config = dict(
-    network='vgg19_bn',
+    network="vgg19_bn",
     num_classes=10,
     # model=tune.grid_search(['BaseModel', 'SparseModel', 'SET_faster']),
-    model='SET_faster',
+    model="SETFaster",
     epsilon=50,
     start_sparse=1,
     momentum=0.9,
     learning_rate=0.01,
-    lr_scheduler='MultiStepLR',
-    lr_milestones=[140,190],
+    lr_scheduler="MultiStepLR",
+    lr_milestones=[140, 190],
     lr_gamma=0.10,
-    dataset_name='CIFAR10',
+    dataset_name="CIFAR10",
     augment_images=True,
     stats_mean=(0.4914, 0.4822, 0.4465),
     stats_std=(0.2023, 0.1994, 0.2010),
-    data_dir='~/nta/datasets',
-    device='cuda',
-    optim_alg='SGD',
+    data_dir="~/nta/datasets",
+    device="cuda",
+    optim_alg="SGD",
     debug_weights=True,
     debug_sparse=True,
 )
 
 tune_config = dict(
-    name='SET_test',
+    name="SET_test",
     num_samples=1,
-    local_dir=os.path.expanduser('~/nta/results'),
+    local_dir=os.path.expanduser("~/nta/results"),
     config=exp_config,
     checkpoint_freq=0,
     checkpoint_at_end=False,
@@ -67,11 +69,9 @@ tune_config = dict(
 
 # override when running local for test
 if not torch.cuda.is_available():
-    exp_config['device'] = 'cpu'
-    tune_config['resources_per_trial'] = {"cpu": 1} 
+    exp_config["device"] = "cpu"
+    tune_config["resources_per_trial"] = {"cpu": 1}
 
 download_dataset(exp_config)
 ray.init()
 tune.run(Trainable, **tune_config)
-
-
