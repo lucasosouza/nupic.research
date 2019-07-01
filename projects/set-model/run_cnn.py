@@ -1,44 +1,77 @@
+# ----------------------------------------------------------------------
+# Numenta Platform for Intelligent Computing (NuPIC)
+# Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
+# with Numenta, Inc., for a separate license for this software code, the
+# following terms and conditions apply:
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero Public License version 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU Affero Public License for more details.
+#
+# You should have received a copy of the GNU Affero Public License
+# along with this program.  If not, see http://www.gnu.org/licenses.
+#
+# http://numenta.org/licenses/
+# ----------------------------------------------------------------------
+
 from utils import Trainable, download_dataset
 import ray
 import ray.tune as tune
 import os
+import torch
+from loggers import DEFAULT_LOGGERS
+
+torch.manual_seed(32) # run diverse samples
 
 # alternative initialization based on configuration
-config = dict(
+exp_config = dict(
     network='vgg19_bn',
     num_classes=10,
-    model=tune.grid_search(['BaseModel', 'SparseModel', 'SET_faster']),
+    # model=tune.grid_search(['BaseModel', 'SparseModel', 'SET_faster']),
+    model='SET_faster',
     epsilon=50,
     start_sparse=1,
     momentum=0.9,
-    learning_rate=1e-2,
+    learning_rate=0.01,
     lr_scheduler='MultiStepLR',
-    lr_milestones=[81,122],
+    lr_milestones=[140,190],
     lr_gamma=0.10,
     dataset_name='CIFAR10',
     augment_images=True,
     stats_mean=(0.4914, 0.4822, 0.4465),
     stats_std=(0.2023, 0.1994, 0.2010),
     data_dir='~/nta/datasets',
-    device='cuda', # 'cpu',
+    device='cuda',
     optim_alg='SGD',
     debug_weights=True,
     debug_sparse=True,
 )
 
-# run
-download_dataset(config)
-ray.init()
-tune.run(
-    Trainable,
-    name='SET_optimization',
+tune_config = dict(
+    name='SET_test',
     num_samples=1,
     local_dir=os.path.expanduser('~/nta/results'),
-    config=config,
+    config=exp_config,
     checkpoint_freq=0,
     checkpoint_at_end=False,
-    stop={"training_iteration": 400},
-    resources_per_trial={"cpu": 1, "gpu": 0.33}
+    stop={"training_iteration": 200},
+    resources_per_trial={"cpu": 1, "gpu": 0.33},
+    loggers=DEFAULT_LOGGERS,
+    verbose=1,
 )
+
+# override when running local for test
+if not torch.cuda.is_available():
+    exp_config['device'] = 'cpu'
+    tune_config['resources_per_trial'] = {"cpu": 1} 
+
+download_dataset(exp_config)
+ray.init()
+tune.run(Trainable, **tune_config)
 
 

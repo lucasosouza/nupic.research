@@ -1,13 +1,36 @@
+# ----------------------------------------------------------------------
+# Numenta Platform for Intelligent Computing (NuPIC)
+# Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
+# with Numenta, Inc., for a separate license for this software code, the
+# following terms and conditions apply:
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero Public License version 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU Affero Public License for more details.
+#
+# You should have received a copy of the GNU Affero Public License
+# along with this program.  If not, see http://www.gnu.org/licenses.
+#
+# http://numenta.org/licenses/
+# ----------------------------------------------------------------------
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 import numpy as np
+from collections import defaultdict
 
 class BaseModel():
-
+    """ 
+    Base model, with training loops and logging functions 
+    """ 
     def __init__(self, network, config={}):
-
         defaults = dict(
             optim_alg='SGD',
             learning_rate=0.1,
@@ -87,15 +110,30 @@ class BaseModel():
             self.log['val_acc'] = acc
 
         if train and self.debug_weights:
-            for idx, m in enumerate(self.network.modules()):
-                if self.has_params(m):
-                    # keep track of mean and std of weights
-                    self.log['layer_' + str(idx) + '_mean'] = torch.mean(m.weight).item()
-                    self.log['layer_' + str(idx) + '_std'] = torch.std(m.weight).item()
+            self._log_weights()
 
     @staticmethod
     def has_params(module):
-        return isinstance(module, nn.Linear) or isinstance(module, nn.Conv2d)
+        if isinstance(module, nn.Linear):
+            return 'linear'
+        elif isinstance(module, nn.Conv2d):
+            return 'conv'
+
+    def _log_weights(self):
+        """ Log weights for all layers which have params """
+
+        if 'param_layers' not in self.__dict__:
+            self.param_layers = defaultdict(list)
+            for m, ltype in [(m, self.has_params(m)) for m in self.network.modules()]:
+                if ltype:
+                    self.param_layers[ltype].append(m)
+
+        # log stats (mean and weight instead of standard distribution)
+        for ltype, layers in self.param_layers.items():
+            for idx, m in enumerate(layers):
+                # keep track of mean and std of weights
+                self.log[ltype + '_' + str(idx) + '_mean'] = torch.mean(m.weight).item()
+                self.log[ltype + '_' + str(idx) + '_std'] = torch.std(m.weight).item()
 
     def save(self):
         pass
@@ -104,7 +142,11 @@ class BaseModel():
         pass
 
 class SparseModel(BaseModel):
-
+    """ 
+    Sparsity implemented by:
+    - Masking on the weights
+    - Zeroing out gradients in backprop before optimizer steps
+    """     
     def setup(self):
         super(SparseModel, self).setup()
 
@@ -173,13 +215,8 @@ class SparseModel(BaseModel):
             self.log['val_loss'] = loss
             self.log['val_acc'] = acc
 
-        # monitor weights (TODO: move to callbacks)
         if train and self.debug_weights:
-            for idx, m in enumerate(self.network.modules()):
-                if self.has_params(m):
-                    # keep track of mean and std of weights
-                    self.log['layer_' + str(idx) + '_mean'] = torch.mean(m.weight).item()
-                    self.log['layer_' + str(idx) + '_std'] = torch.std(m.weight).item()
+            self._log_weights()
 
         # add monitoring of sparse levels
         if train and self.debug_sparse: 
@@ -187,15 +224,31 @@ class SparseModel(BaseModel):
 
 
     def _log_sparse_levels(self):
-        layers = iter(range(len(self.masks)))
         with torch.no_grad():
-            for m in self.sparse_modules:
-                idx = next(layers)
-                zeros = torch.sum((m.weight == 0).int()).item()
+            for idx, m in enumerate(self.sparse_modules):
+                zero_mask = m.weight == 0
+                zero_count = torch.sum(zero_mask.int()).item()
                 size = np.prod(m.weight.shape)
-                self.log['sparse_levels_l' + str(idx+1)] = 1- zeros/size
+                log_name = 'sparse_level_l' + str(idx)
+                self.log[log_name] = 1- zero_count/size
+
+                # log image as well
+                if self.has_params(m) == 'conv':
+                    ratio = 255/np.prod(m.weight.shape[2:])
+                    heatmap = (torch.sum(m.weight, dim=[2,3]).float() * ratio).int()
+                    self.log['img_' + log_name] = heatmap.tolist()
+
 
 class SET_faster(SparseModel):
+    """     
+    Implementation of SET with a more efficient approach of adding new weights (vectorized)
+    The overhead in computation is 10x smaller compared to the original version
+    """ 
+    def setup(self):
+        super(SET_faster, self).setup()    
+
+        # initialize data structure keep track of added synapses
+        self.added_synapses = [None for m in self.masks]
 
     def _run_one_pass(self, loader, train):
         super(SET_faster, self)._run_one_pass(loader, train)
@@ -222,26 +275,34 @@ class SET_faster(SparseModel):
             current_sparsity = torch.sum(A==0).item()
             p_add = num_add / max(current_sparsity, num_add) # avoid div by zero
             P = torch.rand(A.shape).to(self.device) < p_add        
-            new_mask = prune_mask | (P & (A==0))
+            new_synapses = P & (A==0)
+            new_mask = prune_mask | new_synapses
 
-        return new_mask, prune_mask
+        # track added connections
+        return new_mask, prune_mask, new_synapses
 
     def reinitialize_weights(self):        
         """ Reinitialize weights """
-
-        layers = iter(range(len(self.masks)))
-        for m in self.sparse_modules:
-            idx = next(layers)
+        for idx, m in enumerate(self.sparse_modules):
             layer_weights = m.weight.clone().detach()                
-            new_mask, prune_mask = self.prune(layer_weights, self.num_params[idx])
+            new_mask, prune_mask, new_synapses = self.prune(
+                layer_weights, self.num_params[idx])
             with torch.no_grad():
                 self.masks[idx] = new_mask.float()
                 m.weight.data *= prune_mask.float()
 
+                # keep track of added synapes
+                if self.debug_sparse and self.added_synapses[idx] is not None:
+                    total_added = torch.sum(self.added_synapses[idx]).item()
+                    surviving = torch.sum(self.added_synapses[idx] & prune_mask).item()
+                    if total_added:
+                        self.log['surviving_synapses_l' + str(idx)] = surviving / total_added
+                self.added_synapses[idx] = new_synapses
+
         # keep track of mask sizes when debugging
         if self.debug_sparse:
             for idx, m in enumerate(self.masks):    
-                self.log['mask_sizes_l' + str(idx+1)] = torch.sum(m).item()
+                self.log['mask_sizes_l' + str(idx)] = torch.sum(m).item()
 
 
 

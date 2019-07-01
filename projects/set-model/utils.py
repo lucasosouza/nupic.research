@@ -1,3 +1,24 @@
+# ----------------------------------------------------------------------
+# Numenta Platform for Intelligent Computing (NuPIC)
+# Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
+# with Numenta, Inc., for a separate license for this software code, the
+# following terms and conditions apply:
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero Public License version 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU Affero Public License for more details.
+#
+# You should have received a copy of the GNU Affero Public License
+# along with this program.  If not, see http://www.gnu.org/licenses.
+#
+# http://numenta.org/licenses/
+# ----------------------------------------------------------------------
+
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 
@@ -7,11 +28,11 @@ import networks
 
 import os
 import torch
-torch.manual_seed(32) # run diverse samples
 
 class Dataset():
-
-
+    """ 
+    Loads a dataset. Returns object with a pytorch train and test loader 
+    """ 
     def __init__(self,  config=None):
 
         defaults = dict(
@@ -75,7 +96,6 @@ class Trainable(tune.Trainable):
     ray.tune trainable generic class
     Adaptable to any pytorch module
     """
-
     def __init__(self, config=None, logger_creator=None):
         tune.Trainable.__init__(self, config=config, logger_creator=logger_creator)
 
@@ -95,7 +115,8 @@ class Trainable(tune.Trainable):
     def _restore(self, checkpoint):
         self.model.restore(checkpoint)
 
-def download_dataset(config):
+def download_dataset(config): 
+    """ Pre-downloads dataset. Required to avoid multiple simultaneous attempts to download same dataset """
     getattr(datasets, config['dataset_name'])(
     download=True, root=os.path.expanduser(config['data_dir']))
 
