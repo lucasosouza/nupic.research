@@ -110,7 +110,7 @@ class Trainable(tune.Trainable):
         self.model.setup()
 
     def _train(self):
-        log = self.model.run_epoch(self.dataset)
+        log = self.model.run_epoch(self.dataset, self._iteration)
         return log
 
     def _save(self, checkpoint_dir):

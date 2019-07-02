@@ -42,10 +42,9 @@ class BaseModel:
             debug_weights=False,
             start_sparse=None,
             end_sparse=None,
+            pruning_interval=1
         )
-        if config is None:
-            config = {}
-        defaults.update(config)
+        defaults.update(config or {})
         self.__dict__.update(defaults)
 
         # init remaining
@@ -73,16 +72,20 @@ class BaseModel:
         # init loss function
         self.loss_func = nn.CrossEntropyLoss()
 
-    def run_epoch(self, dataset):
+    def run_epoch(self, dataset, epoch):
+        self.current_epoch = epoch
         self.log = {}
         self.network.train()
         self._run_one_pass(dataset.train_loader, train=True)
         self.network.eval()
         self._run_one_pass(dataset.test_loader, train=False)
         if self.lr_scheduler:
-            self.lr_scheduler.step()
+            self._decay_learning_rate()
 
         return self.log
+
+    def _decay_learning_rate(self):
+        self.lr_scheduler.step()
 
     def _run_one_pass(self, loader, train=True):
         epoch_loss = 0
@@ -262,6 +265,87 @@ class SETFaster(SparseModel):
         super(SETFaster, self)._run_one_pass(loader, train)
         if train:
             self.reinitialize_weights()
+
+    def prune(self, weight, num_params, zeta=0.3):
+        """
+        Calculate new weight based on SET approach weight vectorized version
+        aimed at keeping the mask with the similar level of sparsity.
+        """
+        with torch.no_grad():
+
+            # NOTE: another approach is counting how many numbers to prune
+            # calculate thresholds and decay weak connections
+            weight_pos = weight[weight > 0]
+            pos_threshold, _ = torch.kthvalue(weight_pos, int(zeta * len(weight_pos)))
+            weight_neg = weight[weight < 0]
+            neg_threshold, _ = torch.kthvalue(
+                weight_neg, int((1 - zeta) * len(weight_neg))
+            )
+            prune_mask = ((weight >= pos_threshold) | (weight <= neg_threshold)).to(
+                self.device
+            )
+
+            # change mask to add new weight
+            num_add = num_params - torch.sum(prune_mask).item()
+            current_sparsity = torch.sum(weight == 0).item()
+            p_add = num_add / max(current_sparsity, num_add)  # avoid div by zero
+            probs = torch.rand(weight.shape).to(self.device) < p_add
+            new_synapses = probs & (weight == 0)
+            new_mask = prune_mask | new_synapses
+
+        # track added connections
+        return new_mask, prune_mask, new_synapses
+
+    def reinitialize_weights(self):
+        """Reinitialize weights."""
+        for idx, m in enumerate(self.sparse_modules):
+            layer_weights = m.weight.clone().detach()
+            new_mask, prune_mask, new_synapses = self.prune(
+                layer_weights, self.num_params[idx]
+            )
+            with torch.no_grad():
+                self.masks[idx] = new_mask.float()
+                m.weight.data *= prune_mask.float()
+
+                # keep track of added synapes
+                if self.debug_sparse and self.added_synapses[idx] is not None:
+                    total_added = torch.sum(self.added_synapses[idx]).item()
+                    surviving = torch.sum(self.added_synapses[idx] & prune_mask).item()
+                    if total_added:
+                        self.log["surviving_synapses_l" + str(idx)] = (
+                            surviving / total_added
+                        )
+                self.added_synapses[idx] = new_synapses
+
+        # keep track of mask sizes when debugging
+        if self.debug_sparse:
+            for idx, m in enumerate(self.masks):
+                self.log["mask_sizes_l" + str(idx)] = torch.sum(m).item()
+
+class DSNN(SparseModel):
+    """
+    Dynamically sparse neural networks.
+    Our improved version of SET
+    """
+
+    def setup(self):
+        super(SETFaster, self).setup()
+
+        # initialize data structure keep track of added synapses
+        self.added_synapses = [None for m in self.masks]
+
+    def _decay_learning_rate(self):
+        super(DSNN, self)._decay_learning_rate()
+        # decay pruning interval along with learning rate
+        # inversely proportional
+        self.pruning_interval = int(self.pruning_interval * (1/(self.lr_gamma/2)))
+
+    def _run_one_pass(self, loader, train):
+        super(SETFaster, self)._run_one_pass(loader, train)
+        if train:
+            # dynamically decide pruning interval
+            if self.current_epoch % self.pruning_interval == 0:
+                self.reinitialize_weights()
 
     def prune(self, weight, num_params, zeta=0.3):
         """

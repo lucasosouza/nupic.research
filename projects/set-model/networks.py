@@ -56,9 +56,7 @@ class MLP(nn.Module):
             bias=False,
             init_weights=True,
         )
-        if config is None:
-            config = {}
-        defaults.update(config)
+        defaults.update(config or {})
         self.__dict__.update(defaults)
         self.device = torch.device(self.device)
 
