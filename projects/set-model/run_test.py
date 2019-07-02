@@ -41,7 +41,7 @@ config = dict(
     # input_size=784,
     # model params
     # model=tune.grid_search(['BaseModel', 'SparseModel']),
-    model=tune.grid_search("[BaseModel, SparseModel, SETFaster]"),
+    model=tune.grid_search(['BaseModel', 'SparseModel', 'SET_faster']),
     # model='BaseModel',
     debug_sparse=True,
     dataset_name="CIFAR10",
