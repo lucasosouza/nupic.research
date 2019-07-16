@@ -1,0 +1,162 @@
+INFO:root:Data loaded
+INFO:root:Epoch: 1 Train loss: 3.5399 Train Acc: 0.8355 Val loss: 3.0442 Val Acc: 0.8587
+INFO:root:Epoch: 2 Train loss: 2.5722 Train Acc: 0.8783 Val loss: 2.9002 Val Acc: 0.8645
+INFO:root:
+Final - Best Train Acc: 0.8783 Best Val acc: 0.8645
+INFO:root:------------------------
+INFO:root:0.04525637755102041
+INFO:root:0.03982300000000005
+INFO:root:0.03997200000000001
+INFO:root:------------------------
+INFO:root:Data loaded
+INFO:root:Epoch: 1 Train loss: 3.5399 Train Acc: 0.8355 Val loss: 3.0442 Val Acc: 0.8587
+INFO:root:Epoch: 2 Train loss: 2.5722 Train Acc: 0.8783 Val loss: 2.9002 Val Acc: 0.8645
+INFO:root:
+Final - Best Train Acc: 0.8783 Best Val acc: 0.8645
+INFO:root:------------------------
+INFO:root:0.04525637755102041
+INFO:root:0.03982300000000005
+INFO:root:0.03997200000000001
+INFO:root:------------------------
+INFO:root:Epoch: 1 Train loss: 3.5313 Train Acc: 0.8369 Val loss: 3.1802 Val Acc: 0.8574
+INFO:root:Epoch: 2 Train loss: 2.4756 Train Acc: 0.8842 Val loss: 2.9202 Val Acc: 0.8629
+INFO:root:
+Final - Best Train Acc: 0.8842 Best Val acc: 0.8629
+INFO:root:------------------------
+INFO:root:0.022197704081632685
+INFO:root:0.01960099999999998
+INFO:root:0.01949400000000001
+INFO:root:------------------------
+INFO:root:Data loaded
+INFO:root:Epoch: 1 Train loss: 3.5399 Train Acc: 0.8355 Val loss: 3.0442 Val Acc: 0.8587
+INFO:root:Epoch: 2 Train loss: 2.5722 Train Acc: 0.8783 Val loss: 2.9002 Val Acc: 0.8645
+INFO:root:Epoch: 3 Train loss: 2.5433 Train Acc: 0.8792 Val loss: 2.9342 Val Acc: 0.8638
+INFO:root:Epoch: 4 Train loss: 2.5575 Train Acc: 0.8778 Val loss: 2.8841 Val Acc: 0.8697
+INFO:root:Epoch: 5 Train loss: 2.5898 Train Acc: 0.8789 Val loss: 2.9307 Val Acc: 0.8691
+INFO:root:Epoch: 6 Train loss: 2.5768 Train Acc: 0.8786 Val loss: 2.9168 Val Acc: 0.8641
+INFO:root:Epoch: 7 Train loss: 2.6193 Train Acc: 0.8762 Val loss: 3.1452 Val Acc: 0.8544
+INFO:root:Epoch: 8 Train loss: 2.6312 Train Acc: 0.8763 Val loss: 2.9295 Val Acc: 0.8675
+INFO:root:Epoch: 9 Train loss: 2.6368 Train Acc: 0.8752 Val loss: 3.0326 Val Acc: 0.8617
+INFO:root:Epoch: 10 Train loss: 2.6412 Train Acc: 0.8755 Val loss: 3.0067 Val Acc: 0.8624
+INFO:root:Epoch: 11 Train loss: 2.6522 Train Acc: 0.8745 Val loss: 3.0191 Val Acc: 0.8633
+INFO:root:Epoch: 12 Train loss: 2.6665 Train Acc: 0.8747 Val loss: 3.0171 Val Acc: 0.8620
+INFO:root:Epoch: 13 Train loss: 2.6823 Train Acc: 0.8731 Val loss: 3.0064 Val Acc: 0.8629
+INFO:root:Epoch: 14 Train loss: 2.6774 Train Acc: 0.8738 Val loss: 3.1020 Val Acc: 0.8582
+INFO:root:Epoch: 15 Train loss: 2.6702 Train Acc: 0.8745 Val loss: 3.0071 Val Acc: 0.8608
+INFO:root:Epoch: 16 Train loss: 2.6915 Train Acc: 0.8731 Val loss: 3.0133 Val Acc: 0.8642
+INFO:root:Epoch: 17 Train loss: 2.6920 Train Acc: 0.8745 Val loss: 3.0019 Val Acc: 0.8619
+INFO:root:Epoch: 18 Train loss: 2.7275 Train Acc: 0.8726 Val loss: 3.0888 Val Acc: 0.8578
+INFO:root:Epoch: 19 Train loss: 2.6922 Train Acc: 0.8740 Val loss: 3.0942 Val Acc: 0.8568
+INFO:root:Epoch: 20 Train loss: 2.7202 Train Acc: 0.8717 Val loss: 2.9925 Val Acc: 0.8607
+INFO:root:Epoch: 21 Train loss: 2.7024 Train Acc: 0.8730 Val loss: 3.0108 Val Acc: 0.8613
+INFO:root:Epoch: 22 Train loss: 2.7108 Train Acc: 0.8708 Val loss: 3.0730 Val Acc: 0.8597
+INFO:root:Epoch: 23 Train loss: 2.6927 Train Acc: 0.8733 Val loss: 2.9597 Val Acc: 0.8639
+INFO:root:Epoch: 24 Train loss: 2.7286 Train Acc: 0.8717 Val loss: 3.0155 Val Acc: 0.8619
+INFO:root:Epoch: 25 Train loss: 2.6989 Train Acc: 0.8737 Val loss: 3.0239 Val Acc: 0.8596
+INFO:root:Epoch: 26 Train loss: 2.7181 Train Acc: 0.8723 Val loss: 3.0176 Val Acc: 0.8632
+INFO:root:Epoch: 27 Train loss: 2.6839 Train Acc: 0.8733 Val loss: 3.0521 Val Acc: 0.8566
+INFO:root:Epoch: 28 Train loss: 2.6877 Train Acc: 0.8743 Val loss: 3.0307 Val Acc: 0.8585
+INFO:root:Epoch: 29 Train loss: 2.7063 Train Acc: 0.8736 Val loss: 3.0208 Val Acc: 0.8619
+INFO:root:Epoch: 30 Train loss: 2.7017 Train Acc: 0.8732 Val loss: 2.9948 Val Acc: 0.8633
+INFO:root:Epoch: 31 Train loss: 2.6916 Train Acc: 0.8720 Val loss: 2.9943 Val Acc: 0.8640
+INFO:root:Epoch: 32 Train loss: 2.6938 Train Acc: 0.8742 Val loss: 2.9440 Val Acc: 0.8643
+INFO:root:Epoch: 33 Train loss: 2.6959 Train Acc: 0.8729 Val loss: 2.9919 Val Acc: 0.8632
+INFO:root:Epoch: 34 Train loss: 2.6886 Train Acc: 0.8736 Val loss: 2.9631 Val Acc: 0.8635
+INFO:root:Epoch: 35 Train loss: 2.6894 Train Acc: 0.8749 Val loss: 3.1159 Val Acc: 0.8574
+INFO:root:Epoch: 36 Train loss: 2.6962 Train Acc: 0.8732 Val loss: 3.0936 Val Acc: 0.8574
+INFO:root:Epoch: 37 Train loss: 2.7027 Train Acc: 0.8727 Val loss: 2.9929 Val Acc: 0.8610
+INFO:root:Epoch: 38 Train loss: 2.6790 Train Acc: 0.8742 Val loss: 3.0804 Val Acc: 0.8598
+INFO:root:Epoch: 39 Train loss: 2.6801 Train Acc: 0.8730 Val loss: 2.9811 Val Acc: 0.8634
+INFO:root:Epoch: 40 Train loss: 2.7026 Train Acc: 0.8723 Val loss: 3.0507 Val Acc: 0.8603
+INFO:root:Epoch: 41 Train loss: 2.7139 Train Acc: 0.8720 Val loss: 3.0460 Val Acc: 0.8586
+INFO:root:Epoch: 42 Train loss: 2.7010 Train Acc: 0.8734 Val loss: 3.0215 Val Acc: 0.8606
+INFO:root:Epoch: 43 Train loss: 2.6835 Train Acc: 0.8749 Val loss: 3.0525 Val Acc: 0.8558
+INFO:root:Epoch: 44 Train loss: 2.6951 Train Acc: 0.8730 Val loss: 3.0889 Val Acc: 0.8567
+INFO:root:Epoch: 45 Train loss: 2.6979 Train Acc: 0.8730 Val loss: 3.1300 Val Acc: 0.8573
+INFO:root:Epoch: 46 Train loss: 2.6635 Train Acc: 0.8741 Val loss: 2.9982 Val Acc: 0.8590
+INFO:root:Epoch: 47 Train loss: 2.6886 Train Acc: 0.8735 Val loss: 3.0109 Val Acc: 0.8619
+INFO:root:Epoch: 48 Train loss: 2.6673 Train Acc: 0.8743 Val loss: 3.0108 Val Acc: 0.8617
+INFO:root:Epoch: 49 Train loss: 2.6890 Train Acc: 0.8742 Val loss: 3.0722 Val Acc: 0.8585
+INFO:root:Epoch: 50 Train loss: 2.6884 Train Acc: 0.8733 Val loss: 3.0303 Val Acc: 0.8614
+INFO:root:Epoch: 51 Train loss: 2.7029 Train Acc: 0.8734 Val loss: 3.0151 Val Acc: 0.8586
+INFO:root:Epoch: 52 Train loss: 2.6563 Train Acc: 0.8758 Val loss: 2.9969 Val Acc: 0.8611
+INFO:root:Epoch: 53 Train loss: 2.6915 Train Acc: 0.8735 Val loss: 2.9516 Val Acc: 0.8636
+INFO:root:Epoch: 54 Train loss: 2.6544 Train Acc: 0.8759 Val loss: 3.0137 Val Acc: 0.8604
+INFO:root:Epoch: 55 Train loss: 2.6747 Train Acc: 0.8746 Val loss: 2.9956 Val Acc: 0.8566
+INFO:root:Epoch: 56 Train loss: 2.6580 Train Acc: 0.8748 Val loss: 2.9112 Val Acc: 0.8650
+INFO:root:Epoch: 57 Train loss: 2.6619 Train Acc: 0.8741 Val loss: 2.9835 Val Acc: 0.8618
+INFO:root:Epoch: 58 Train loss: 2.6771 Train Acc: 0.8740 Val loss: 3.0655 Val Acc: 0.8566
+INFO:root:Epoch: 59 Train loss: 2.6901 Train Acc: 0.8743 Val loss: 2.9778 Val Acc: 0.8616
+INFO:root:Epoch: 60 Train loss: 2.6520 Train Acc: 0.8742 Val loss: 3.0007 Val Acc: 0.8591
+INFO:root:Epoch: 61 Train loss: 2.6507 Train Acc: 0.8739 Val loss: 3.0565 Val Acc: 0.8612
+INFO:root:Epoch: 62 Train loss: 2.6658 Train Acc: 0.8743 Val loss: 3.0728 Val Acc: 0.8601
+INFO:root:Epoch: 63 Train loss: 2.6421 Train Acc: 0.8750 Val loss: 3.0141 Val Acc: 0.8580
+INFO:root:Epoch: 64 Train loss: 2.6416 Train Acc: 0.8744 Val loss: 3.0686 Val Acc: 0.8608
+INFO:root:Epoch: 65 Train loss: 2.6401 Train Acc: 0.8767 Val loss: 2.9737 Val Acc: 0.8651
+INFO:root:Epoch: 66 Train loss: 2.6434 Train Acc: 0.8761 Val loss: 2.9532 Val Acc: 0.8645
+INFO:root:Epoch: 67 Train loss: 2.6462 Train Acc: 0.8750 Val loss: 2.9466 Val Acc: 0.8653
+INFO:root:Epoch: 68 Train loss: 2.6507 Train Acc: 0.8762 Val loss: 2.9802 Val Acc: 0.8644
+INFO:root:Epoch: 69 Train loss: 2.6207 Train Acc: 0.8784 Val loss: 3.0030 Val Acc: 0.8591
+INFO:root:Epoch: 70 Train loss: 2.6262 Train Acc: 0.8768 Val loss: 3.0410 Val Acc: 0.8564
+INFO:root:Epoch: 71 Train loss: 2.6355 Train Acc: 0.8759 Val loss: 2.9296 Val Acc: 0.8644
+INFO:root:Epoch: 72 Train loss: 2.6284 Train Acc: 0.8773 Val loss: 2.9504 Val Acc: 0.8614
+INFO:root:Epoch: 73 Train loss: 2.6137 Train Acc: 0.8780 Val loss: 2.9875 Val Acc: 0.8615
+INFO:root:Epoch: 74 Train loss: 2.6130 Train Acc: 0.8779 Val loss: 2.9570 Val Acc: 0.8638
+INFO:root:Epoch: 75 Train loss: 2.6351 Train Acc: 0.8766 Val loss: 2.9233 Val Acc: 0.8610
+INFO:root:Epoch: 76 Train loss: 2.6317 Train Acc: 0.8776 Val loss: 2.9723 Val Acc: 0.8616
+INFO:root:Epoch: 77 Train loss: 2.6207 Train Acc: 0.8773 Val loss: 3.0813 Val Acc: 0.8538
+INFO:root:Epoch: 78 Train loss: 2.6177 Train Acc: 0.8769 Val loss: 2.9777 Val Acc: 0.8613
+INFO:root:Epoch: 79 Train loss: 2.6172 Train Acc: 0.8764 Val loss: 2.9670 Val Acc: 0.8631
+INFO:root:Epoch: 80 Train loss: 2.6264 Train Acc: 0.8768 Val loss: 2.9269 Val Acc: 0.8630
+INFO:root:Epoch: 81 Train loss: 2.6225 Train Acc: 0.8765 Val loss: 2.9988 Val Acc: 0.8619
+INFO:root:Epoch: 82 Train loss: 2.6199 Train Acc: 0.8774 Val loss: 3.0216 Val Acc: 0.8565
+INFO:root:Epoch: 83 Train loss: 2.6249 Train Acc: 0.8768 Val loss: 3.0559 Val Acc: 0.8558
+INFO:root:Epoch: 84 Train loss: 2.6106 Train Acc: 0.8766 Val loss: 3.0289 Val Acc: 0.8618
+INFO:root:Epoch: 85 Train loss: 2.6040 Train Acc: 0.8782 Val loss: 3.0059 Val Acc: 0.8579
+INFO:root:Epoch: 86 Train loss: 2.5991 Train Acc: 0.8779 Val loss: 3.0151 Val Acc: 0.8577
+INFO:root:Epoch: 87 Train loss: 2.6193 Train Acc: 0.8769 Val loss: 3.1139 Val Acc: 0.8557
+INFO:root:Epoch: 88 Train loss: 2.6022 Train Acc: 0.8782 Val loss: 2.9922 Val Acc: 0.8586
+INFO:root:Epoch: 89 Train loss: 2.6054 Train Acc: 0.8781 Val loss: 2.9770 Val Acc: 0.8615
+INFO:root:Epoch: 90 Train loss: 2.5992 Train Acc: 0.8788 Val loss: 2.9790 Val Acc: 0.8609
+INFO:root:Epoch: 91 Train loss: 2.6093 Train Acc: 0.8773 Val loss: 3.0701 Val Acc: 0.8563
+INFO:root:Epoch: 92 Train loss: 2.5999 Train Acc: 0.8775 Val loss: 3.0583 Val Acc: 0.8565
+INFO:root:Epoch: 93 Train loss: 2.5995 Train Acc: 0.8777 Val loss: 2.9639 Val Acc: 0.8624
+INFO:root:Epoch: 94 Train loss: 2.5841 Train Acc: 0.8784 Val loss: 2.9085 Val Acc: 0.8663
+INFO:root:Epoch: 95 Train loss: 2.5817 Train Acc: 0.8787 Val loss: 2.9528 Val Acc: 0.8596
+INFO:root:Epoch: 96 Train loss: 2.5721 Train Acc: 0.8781 Val loss: 2.9314 Val Acc: 0.8636
+INFO:root:Epoch: 97 Train loss: 2.5741 Train Acc: 0.8786 Val loss: 2.9402 Val Acc: 0.8622
+INFO:root:Epoch: 98 Train loss: 2.5676 Train Acc: 0.8777 Val loss: 2.9438 Val Acc: 0.8625
+INFO:root:Epoch: 99 Train loss: 2.5808 Train Acc: 0.8790 Val loss: 2.9301 Val Acc: 0.8642
+INFO:root:Epoch: 100 Train loss: 2.5680 Train Acc: 0.8799 Val loss: 2.9342 Val Acc: 0.8624
+INFO:root:
+Final - Best Train Acc: 0.8799 Best Val acc: 0.8697
+INFO:root:------------------------
+INFO:root:0.045774234693877536
+INFO:root:0.039429999999999965
+INFO:root:0.03966499999999995
+INFO:root:------------------------
+INFO:root:Epoch: 1 Train loss: 3.5132 Train Acc: 0.8354 Val loss: 3.1343 Val Acc: 0.8551
+INFO:root:Epoch: 2 Train loss: 2.5163 Train Acc: 0.8807 Val loss: 2.8374 Val Acc: 0.8676
+INFO:root:Epoch: 3 Train loss: 2.4989 Train Acc: 0.8825 Val loss: 3.0238 Val Acc: 0.8563
+INFO:root:Epoch: 4 Train loss: 2.5164 Train Acc: 0.8817 Val loss: 3.4373 Val Acc: 0.8430
+INFO:root:Epoch: 5 Train loss: 2.5864 Train Acc: 0.8790 Val loss: 4.2599 Val Acc: 0.8080
+INFO:root:Epoch: 6 Train loss: 2.7628 Train Acc: 0.8712 Val loss: 4.6686 Val Acc: 0.7961
+INFO:root:Epoch: 7 Train loss: 2.9831 Train Acc: 0.8621 Val loss: 6.4085 Val Acc: 0.7350
+INFO:root:Epoch: 8 Train loss: 3.1908 Train Acc: 0.8537 Val loss: 7.1030 Val Acc: 0.6901
+INFO:root:Epoch: 9 Train loss: 3.3542 Train Acc: 0.8464 Val loss: 8.3030 Val Acc: 0.6434
+INFO:root:Epoch: 10 Train loss: 3.5209 Train Acc: 0.8375 Val loss: 9.6191 Val Acc: 0.5697
+INFO:root:Epoch: 11 Train loss: 3.7948 Train Acc: 0.8283 Val loss: 7.9525 Val Acc: 0.6376
+INFO:root:Epoch: 12 Train loss: 4.2837 Train Acc: 0.8053 Val loss: 9.2270 Val Acc: 0.5908
+INFO:root:Epoch: 13 Train loss: 4.7154 Train Acc: 0.7893 Val loss: 10.3996 Val Acc: 0.5521
+INFO:root:Epoch: 14 Train loss: 5.7215 Train Acc: 0.7452 Val loss: 10.9732 Val Acc: 0.5023
+INFO:root:Epoch: 15 Train loss: 6.6987 Train Acc: 0.7047 Val loss: 18.5732 Val Acc: 0.3913
+INFO:root:Epoch: 16 Train loss: 7.7055 Train Acc: 0.6541 Val loss: 29.3992 Val Acc: 0.2491
+INFO:root:Epoch: 17 Train loss: 12.8791 Train Acc: 0.3915 Val loss: 43.6559 Val Acc: 0.1739
+INFO:root:Epoch: 18 Train loss: 14.5030 Train Acc: 0.2673 Val loss: 28.6462 Val Acc: 0.1000
+INFO:root:Epoch: 19 Train loss: 16.8386 Train Acc: 0.1856 Val loss: 139.6268 Val Acc: 0.1000
+INFO:root:Epoch: 20 Train loss: 15.9190 Train Acc: 0.2117 Val loss: 16.4483 Val Acc: 0.1548
+INFO:root:Epoch: 21 Train loss: 16.3635 Train Acc: 0.1936 Val loss: 15.6966 Val Acc: 0.2320
+INFO:root:Epoch: 22 Train loss: 16.3290 Train Acc: 0.1926 Val loss: 15.7380 Val Acc: 0.2260
+INFO:root:Epoch: 23 Train loss: 16.3479 Train Acc: 0.1923 Val loss: 18.4085 Val Acc: 0.1210
+INFO:root:Epoch: 24 Train loss: 17.5448 Train Acc: 0.1324 Val loss: 17.5908 Val Acc: 0.1359
+INFO:root:Epoch: 25 Train loss: 17.5402 Train Acc: 0.1340 Val loss: 17.5969 Val Acc: 0.1440
