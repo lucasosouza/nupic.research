@@ -19,12 +19,18 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import numpy as np
 import torch
 from torch import nn
-from torchvision import models
-import numpy as np
+
 
 class KWinners(nn.Module):
+    """Test implementation of KWinners
+    TODO:
+    - T should be per sample, not per iteration
+
+    Currently not being used
+    """
 
     def __init__(self, k_perc=0.1, use_absolute=False, use_boosting=False, beta=0.01):
         super(KWinners, self).__init__()
@@ -32,7 +38,7 @@ class KWinners(nn.Module):
         self.duty_cycle = None
         self.k_perc = k_perc
         self.beta = beta
-        self.T = 600 # 1000
+        self.T = 600  # 1000
         self.current_time = 0
         self.use_absolute = use_absolute
         self.use_boosting = use_boosting
@@ -40,7 +46,7 @@ class KWinners(nn.Module):
     def forward(self, x):
 
         # define k
-        units_shape = x.shape[1:] # remove batch size
+        units_shape = x.shape[1:]  # remove batch size
         num_units = np.prod(units_shape)
         k = int(self.k_perc * num_units)
 
@@ -53,13 +59,13 @@ class KWinners(nn.Module):
         if self.current_time < self.T:
             self.current_time += 1
 
-        # calculating threshold and updating duty cycle 
+        # calculating threshold and updating duty cycle
         tx = x.clone().detach()
         if self.use_absolute:
             tx = torch.abs(tx)
         # no need to calculate gradients
         with torch.set_grad_enabled(False):
-            threshold = self._get_threshold(tx, k)            
+            threshold = self._get_threshold(tx, k)
             # if duty cycle, apply boosting, at training only
             if self.duty_cycle is not None and self.training and self.use_boosting:
                 boosting = self._calculate_boosting()
@@ -70,24 +76,23 @@ class KWinners(nn.Module):
             # update duty cycle at training only
             if self.training:
                 self._update_duty_cycle(mask)
-            
+
         return x * mask.float()
 
     def _get_threshold(self, x, k):
-        """Calculate dynamic theshold""" 
-
+        """Calculate dynamic theshold"""
         # k-winners over neurons only
         flatten_x = x.view(x.shape[0], -1)
         pos = int((flatten_x.shape[1] - k))
         threshold, _ = torch.kthvalue(flatten_x, pos, dim=-1)
-        expanded_size = [x.shape[0]] + [1 for _ in range(len(x.shape)-1)]
+        expanded_size = [x.shape[0]] + [1 for _ in range(len(x.shape) - 1)]
         return threshold.view(expanded_size)
 
     def _update_duty_cycle(self, mask):
-        """Update duty cycle""" 
+        """Update duty cycle"""
         num_activations = torch.sum(mask, dim=0).float()
         time = min(self.T, self.current_time)
-        self.duty_cycle *= (time-1)/time
+        self.duty_cycle *= (time - 1) / time
         self.duty_cycle += num_activations / time
 
     def _calculate_boosting(self):
@@ -99,7 +104,3 @@ class KWinners(nn.Module):
         # b = boosting.view(-1)
         # print(torch.min(b).item(), torch.mean(b).item(), torch.max(b).item())
         return boosting
-
-
-
-

@@ -24,10 +24,11 @@ import os
 from ray import tune
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
 
 import models
 import networks
+from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
+
 
 class Dataset:
     """Loads a dataset.
@@ -105,8 +106,9 @@ class Dataset:
                 [
                     transforms.ToTensor(),
                     transforms.Normalize(self.stats_mean, self.stats_std),
-                    RandomNoise(noise, high_value=0.5 + 2 * 0.20, low_value=0.5 - 2 * 0.2),
-
+                    RandomNoise(
+                        noise, high_value=0.5 + 2 * 0.20, low_value=0.5 - 2 * 0.2
+                    ),
                 ]
             )
             noise_set = getattr(datasets, self.dataset_name)(
@@ -115,6 +117,7 @@ class Dataset:
             self.noise_loader = DataLoader(
                 dataset=noise_set, batch_size=self.batch_size_test, shuffle=False
             )
+
 
 class Trainable(tune.Trainable):
     """ray.tune trainable generic class Adaptable to any pytorch module."""

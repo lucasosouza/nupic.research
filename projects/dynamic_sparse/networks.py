@@ -19,22 +19,26 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import math
+
 import torch
 from torch import nn
 from torchvision import models
-from nupic.torch.modules import KWinners2d, Flatten
-import math
+
+from nupic.torch.modules import Flatten, KWinners2d
+
 
 def vgg19_bn(config):
     model = models.vgg19_bn()
     # remove all fc layers, replace for a single fc layer, from 143mi to 20mi parameters
-    model.classifier = nn.Linear(7 * 7 * 512, config["num_classes"])        
+    model.classifier = nn.Linear(7 * 7 * 512, config["num_classes"])
     return model
 
-def vgg19_bn_kw(config):   
+
+def vgg19_bn_kw(config):
     model = models.vgg19_bn()
     # remove all fc layers, replace for a single fc layer, from 143mi to 20mi parameters
-    model.classifier = nn.Linear(7 * 7 * 512, config["num_classes"]) 
+    model.classifier = nn.Linear(7 * 7 * 512, config["num_classes"])
 
     new_features = []
     for layer in model.features:
@@ -47,17 +51,21 @@ def vgg19_bn_kw(config):
             last_conv_out_channels = layer.out_channels
         # switch ReLU to kWinners2d
         elif isinstance(layer, nn.ReLU):
-            new_features.append(KWinners2d(
-                channels=last_conv_out_channels,
-                percent_on=config['percent_on'],
-                boost_strength=config['boost_strength'],
-                boost_strength_factor=config['boost_strength_factor']))
+            new_features.append(
+                KWinners2d(
+                    channels=last_conv_out_channels,
+                    percent_on=config["percent_on"],
+                    boost_strength=config["boost_strength"],
+                    boost_strength_factor=config["boost_strength_factor"],
+                )
+            )
         # otherwise add it as normal
         else:
             new_features.append(layer)
     model.features = nn.Sequential(*new_features)
 
     return model
+
 
 def resnet18(config):
     return models.resnet18(num_classes=config["num_classes"])
@@ -68,7 +76,6 @@ def resnet50(config):
 
 
 class VGG19(nn.Module):
-
     def __init__(self, config=None):
         super(VGG19, self).__init__()
 
@@ -80,7 +87,7 @@ class VGG19(nn.Module):
             dropout=0.3,
             bias=False,
             init_weights=True,
-            kwinners=False
+            kwinners=False,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -96,22 +103,22 @@ class VGG19(nn.Module):
 
         # initialize network
         layers = [
-            *self._conv_block(3,64),
-            *self._conv_block(64,64, pool=True), # 16x16
-            *self._conv_block(64,128),
-            *self._conv_block(128,128, pool=True), # 8x8
-            *self._conv_block(128,256),
-            *self._conv_block(256,256),
-            *self._conv_block(256,256),
-            *self._conv_block(256,256, pool=True), # 4x4
-            *self._conv_block(256,512),
-            *self._conv_block(512,512),
-            *self._conv_block(512,512),
-            *self._conv_block(512,512, pool=True), # 2x2
-            *self._conv_block(512,512),
-            *self._conv_block(512,512),
-            *self._conv_block(512,512),
-            *self._conv_block(512,512, pool=True), # 1x1
+            *self._conv_block(3, 64),
+            *self._conv_block(64, 64, pool=True),  # 16x16
+            *self._conv_block(64, 128),
+            *self._conv_block(128, 128, pool=True),  # 8x8
+            *self._conv_block(128, 256),
+            *self._conv_block(256, 256),
+            *self._conv_block(256, 256),
+            *self._conv_block(256, 256, pool=True),  # 4x4
+            *self._conv_block(256, 512),
+            *self._conv_block(512, 512),
+            *self._conv_block(512, 512),
+            *self._conv_block(512, 512, pool=True),  # 2x2
+            *self._conv_block(512, 512),
+            *self._conv_block(512, 512),
+            *self._conv_block(512, 512),
+            *self._conv_block(512, 512, pool=True),  # 1x1
         ]
         layers.append(Flatten())
         layers.append(nn.Linear(512, config["num_classes"]))
@@ -122,16 +129,17 @@ class VGG19(nn.Module):
 
     def _kwinners(self, fout):
         return KWinners2d(
-               channels=fout,
-               percent_on=self.percent_on,
-               boost_strength=self.boost_strength,
-               boost_strength_factor=self.boost_strength_factor)   
+            channels=fout,
+            percent_on=self.percent_on,
+            boost_strength=self.boost_strength,
+            boost_strength_factor=self.boost_strength_factor,
+        )
 
     def _conv_block(self, fin, fout, pool=False):
         block = [
             nn.Conv2d(fin, fout, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(fout),
-            self.nonlinear_func(fout)
+            self.nonlinear_func(fout),
         ]
         if pool:
             block.append(self.pool_func())
@@ -154,6 +162,7 @@ class VGG19(nn.Module):
                 n = m.weight.size(1)
                 m.weight.data.normal_(0, 0.01)
                 m.bias.data.zero_()
+
 
 class MLP(nn.Module):
     """

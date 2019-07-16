@@ -47,7 +47,7 @@ class BaseModel:
             flip=False,
             weight_prune_perc=0,
             grad_prune_perc=0,
-            test_noise=False
+            test_noise=False,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -78,7 +78,7 @@ class BaseModel:
         self.loss_func = nn.CrossEntropyLoss()
 
     def run_epoch(self, dataset, epoch):
-        self.current_epoch = epoch+1
+        self.current_epoch = epoch + 1
         self.log = {}
         self.network.train()
         self._run_one_pass(dataset.train_loader, train=True)
@@ -260,7 +260,9 @@ class SparseModel(BaseModel):
                 if self.log_images:
                     if self.has_params(m) == "conv":
                         ratio = 255 / np.prod(m.weight.shape[2:])
-                        heatmap = (torch.sum(m.weight, dim=[2, 3]).float() * ratio).int()
+                        heatmap = (
+                            torch.sum(m.weight, dim=[2, 3]).float() * ratio
+                        ).int()
                         self.log["img_" + log_name] = heatmap.tolist()
 
 
@@ -325,10 +327,14 @@ class SET(SparseModel):
 
                 # keep track of added synapes
                 if self.debug_sparse:
-                    self.log["added_synapses_l" + str(idx)] = torch.sum(new_synapses).item()
+                    self.log["added_synapses_l" + str(idx)] = torch.sum(
+                        new_synapses
+                    ).item()
                     if self.added_synapses[idx] is not None:
                         total_added = torch.sum(self.added_synapses[idx]).item()
-                        surviving = torch.sum(self.added_synapses[idx] & prune_mask).item()
+                        surviving = torch.sum(
+                            self.added_synapses[idx] & prune_mask
+                        ).item()
                         if total_added:
                             self.log["surviving_synapses_l" + str(idx)] = (
                                 surviving / total_added
@@ -358,7 +364,6 @@ class DSNN(SparseModel):
             self.prune_grad_sign = 1
             self.flip_epoch = 30
 
-
     def _post_epoch_updates(self, dataset=None):
         super(DSNN, self)._post_epoch_updates(dataset)
 
@@ -371,7 +376,7 @@ class DSNN(SparseModel):
         # froze this for now
         # if self.current_epoch in self.lr_milestones:
         #     # decay pruning interval, inversely proportional with learning rate
-        #     self.pruning_interval = max(self.pruning_interval, 
+        #     self.pruning_interval = max(self.pruning_interval,
         #         int((self.pruning_interval * (1/self.lr_gamma))/3))
 
     def _run_one_pass(self, loader, train, noise=False):
@@ -393,7 +398,9 @@ class DSNN(SparseModel):
                 if train:
                     loss.backward()
                     # zero the gradients for dead connections
-                    for idx, (mask, m) in enumerate(zip(self.masks, self.sparse_modules)):
+                    for idx, (mask, m) in enumerate(
+                        zip(self.masks, self.sparse_modules)
+                    ):
                         m.weight.grad *= mask
                         # save gradients before any operation
                         # TODO: will need to integrate over several epochs later
@@ -453,17 +460,17 @@ class DSNN(SparseModel):
             neg_threshold, _ = torch.kthvalue(
                 weight_neg, max(int((1 - zeta) * len(weight_neg)), 1)
             )
-            weight_keep_mask = ((weight >= pos_threshold) | (weight <= neg_threshold))
+            weight_keep_mask = (weight >= pos_threshold) | (weight <= neg_threshold)
             weight_keep_mask.to(self.device)
-            self.log["weight_keep_mask_l" + str(idx)] = torch.sum(weight_keep_mask).item()
+            self.log["weight_keep_mask_l" + str(idx)] = torch.sum(
+                weight_keep_mask
+            ).item()
 
             # calculate gradient mask
             kappa = self.grad_prune_perc
             grad = grad * self.prune_grad_sign * torch.sign(weight)
             deltas = grad.view(-1)
-            grad_treshold, _ = torch.kthvalue(
-                deltas, max(int(kappa * len(deltas)), 1)
-            )
+            grad_treshold, _ = torch.kthvalue(deltas, max(int(kappa * len(deltas)), 1))
             grad_keep_mask = (grad >= grad_treshold).to(self.device)
             # keep only those which are in the original weight matrix
             grad_keep_mask = grad_keep_mask & (weight != 0)
@@ -505,7 +512,9 @@ class DSNN(SparseModel):
                     # count how many synapses from last round have survived
                     if self.added_synapses[idx] is not None:
                         total_added = torch.sum(self.added_synapses[idx]).item()
-                        surviving = torch.sum(self.added_synapses[idx] & keep_mask).item()
+                        surviving = torch.sum(
+                            self.added_synapses[idx] & keep_mask
+                        ).item()
                         if total_added:
                             self.log["surviving_synapses_l" + str(idx)] = (
                                 surviving / total_added
@@ -517,4 +526,3 @@ class DSNN(SparseModel):
         if self.debug_sparse:
             for idx, m in enumerate(self.masks):
                 self.log["mask_sizes_l" + str(idx)] = torch.sum(m).item()
-

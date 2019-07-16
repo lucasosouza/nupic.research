@@ -32,9 +32,9 @@ torch.manual_seed(32)  # run diversse samples
 
 # alternative initialization based on configuration
 exp_config = dict(
-    #### model related
+    # model related
     device="cuda",
-#    network=tune.grid_search(["vgg19_bn_kw", "vgg19_bn"]),
+    # network=tune.grid_search(["vgg19_bn_kw", "vgg19_bn"]),
     network="VGG19",
     num_classes=10,
     model=tune.grid_search(["BaseModel", "SparseModel", "SET", "DSNN"]),
@@ -44,18 +44,18 @@ exp_config = dict(
     stats_mean=(0.4914, 0.4822, 0.4465),
     stats_std=(0.2023, 0.1994, 0.2010),
     data_dir="~/nta/datasets",
-    #### optimizer related
+    # optimizer related
     optim_alg="SGD",
     momentum=0.9,
     learning_rate=0.01,
     lr_scheduler="MultiStepLR",
-    lr_milestones=[250,290],
+    lr_milestones=[250, 290],
     lr_gamma=0.10,
     debug_weights=True,
-    #### sparse related
+    # sparse related
     epsilon=100,
     start_sparse=1,
-    end_sparse=None, 
+    end_sparse=None,
     debug_sparse=True,
     flip=False,
     weight_prune_perc=0.3,
@@ -65,7 +65,7 @@ exp_config = dict(
     boost_strength_factor=0.7,
     test_noise=True,
     noise_level=0.1,
-    kwinners=tune.grid_search([True, False]) # moved to a parameter
+    kwinners=tune.grid_search([True, False]),  # moved to a parameter
 )
 
 tune_config = dict(
@@ -82,11 +82,10 @@ tune_config = dict(
 )
 
 # override when running local for test
-# if not torch.cuda.is_available():
-#     exp_config["device"] = "cpu"
-#     tune_config["resources_per_trial"] = {"cpu": 1}
+if not torch.cuda.is_available():
+    exp_config["device"] = "cpu"
+    tune_config["resources_per_trial"] = {"cpu": 1}
 
-print("running the right file")
 download_dataset(exp_config)
 ray.init()
 tune.run(Trainable, **tune_config)

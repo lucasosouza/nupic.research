@@ -48,7 +48,7 @@ config = dict(
     device="cpu",
     optim_alg="SGD",
     batch_size_train=10,
-    batch_size_test=10
+    batch_size_test=10,
 )
 
 # run
