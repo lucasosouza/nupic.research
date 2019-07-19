@@ -48,6 +48,9 @@ class BaseModel:
             weight_prune_perc=0,
             grad_prune_perc=0,
             test_noise=False,
+            percent_on=0.3,
+            boost_strength=1.4,
+            boost_strength_factor=0.7,            
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -64,8 +67,9 @@ class BaseModel:
                 self.network.parameters(), lr=self.learning_rate
             )
         elif self.optim_alg == "SGD":
+            # added weight decay
             self.optimizer = optim.SGD(
-                self.network.parameters(), lr=self.learning_rate, momentum=self.momentum
+                self.network.parameters(), lr=self.learning_rate, momentum=self.momentum, weight_decay=2e-4
             )
 
         # add a learning rate scheduler
@@ -526,3 +530,207 @@ class DSNN(SparseModel):
         if self.debug_sparse:
             for idx, m in enumerate(self.masks):
                 self.log["mask_sizes_l" + str(idx)] = torch.sum(m).item()
+
+
+class DSNNHeb(SparseModel):
+    """
+    Dynamically sparse neural networks.
+    Our improved version of SET
+    """
+
+    def setup(self):
+        super(DSNNHeb, self).setup()
+        self.added_synapses = [None for m in self.masks]
+        self.last_gradients = [None for m in self.masks]
+
+        # initializae sign to 1 if to be flipped later
+        self.prune_grad_sign = -1
+        if self.flip:
+            self.prune_grad_sign = 1
+            self.flip_epoch = 30
+
+        # initialize hebbian learning
+        self.network.hebbian_learning = True
+
+        # add specific defaults
+        new_defaults = (dict(
+            pruning_active=True,
+            # pruning_early_stop=True,
+            pruning_early_stop_threshold=0.02,
+        ))
+        new_defaults = {k:v for k,v in new_defaults.items() if k not in self.__dict__ }
+        self.__dict__.update(new_defaults)
+
+    def _post_epoch_updates(self, dataset=None):
+        super(DSNNHeb, self)._post_epoch_updates(dataset)
+
+        # flip at a fixed interval
+        if self.flip:
+            if self.current_epoch == self.flip_epoch and self.prune_grad_sign == 1:
+                self.prune_grad_sign = -1
+
+        # zero out correlations
+        self.network.correlations = []
+
+        # update only when learning rate updates
+        # froze this for now
+        # if self.current_epoch in self.lr_milestones:
+        #     # decay pruning interval, inversely proportional with learning rate
+        #     self.pruning_interval = max(self.pruning_interval,
+        #         int((self.pruning_interval * (1/self.lr_gamma))/3))
+
+    def _run_one_pass(self, loader, train, noise=False):
+        """TODO: reimplement by calling super and passing a hook"""
+        epoch_loss = 0
+        epoch_correct = 0
+        for inputs, targets in loader:
+            # setup for training
+            inputs = inputs.to(self.device)
+            targets = targets.to(self.device)
+            self.optimizer.zero_grad()
+
+            # forward + backward + optimize
+            with torch.set_grad_enabled(train):
+                outputs = self.network(inputs)
+                _, preds = torch.max(outputs, 1)
+                epoch_correct += torch.sum(targets == preds).item()
+                loss = self.loss_func(outputs, targets)
+                if train:
+                    loss.backward()
+                    # zero the gradients for dead connections
+                    for idx, (mask, m) in enumerate(
+                        zip(self.masks, self.sparse_modules)
+                    ):
+                        m.weight.grad *= mask
+                        # save gradients before any operation
+                        # TODO: will need to integrate over several epochs later
+                        self.last_gradients[idx] = m.weight.grad
+
+                    self.optimizer.step()
+
+            # keep track of loss and accuracy
+            epoch_loss += loss.item() * inputs.size(0)
+
+        # store loss and acc at each pass
+        loss = epoch_loss / len(loader.dataset)
+        acc = epoch_correct / len(loader.dataset)
+        if train:
+            self.log["train_loss"] = loss
+            self.log["train_acc"] = acc
+        else:
+            if noise:
+                self.log["noise_loss"] = loss
+                self.log["noise_acc"] = acc
+            else:
+                self.log["val_loss"] = loss
+                self.log["val_acc"] = acc
+
+        # add monitoring of weights
+        if train and self.debug_weights:
+            self._log_weights()
+
+        # add monitoring of sparse levels
+        if train and self.debug_sparse:
+            self._log_sparse_levels()
+
+        # dynamically decide pruning interval
+        if train:
+            # no dynamic interval at this moment
+            # if self.current_epoch % self.pruning_interval == 0:
+            self.reinitialize_weights()
+
+    def prune(self, weight, grad, num_params, corr, idx=0):
+        """
+        Calculate new weight based on SET approach weight vectorized version
+        aimed at keeping the mask with the similar level of sparsity.
+
+        Changes:
+        - higher zeta
+        - two masks: one based on weights, another based on gradients
+
+        Have access to correlation 
+        Error added contiguous to fix
+        RuntimeError: invalid argument 2: view size is not compatible with input tensor's size and stride (at least one dimension spans across two contiguous subspaces). Call .contiguous() before .view(). at /pytorch/aten/src/THC/generic/THCTensor.cpp:209
+        """
+        with torch.no_grad():
+
+            # calculate weight mask
+            zeta = self.weight_prune_perc
+            weight_pos = weight[weight > 0]
+            pos_threshold, _ = torch.kthvalue(
+                weight_pos, max(int(zeta * len(weight_pos)), 1)
+            )
+            weight_neg = weight[weight < 0]
+            neg_threshold, _ = torch.kthvalue(
+                weight_neg, max(int((1 - zeta) * len(weight_neg)), 1)
+            )
+            weight_keep_mask = (weight >= pos_threshold) | (weight <= neg_threshold)
+            weight_keep_mask.to(self.device)
+            self.log["weight_keep_mask_l" + str(idx)] = torch.sum(
+                weight_keep_mask
+            ).item()
+
+            # no gradient mask, just a keep mask
+            keep_mask = weight_keep_mask
+
+            # calculate number of parameters to add
+            num_add = num_params - torch.sum(keep_mask).item()
+            self.log["missing_weights_l" + str(idx)] = num_add            
+            # transpose to fit the weights
+            corr = corr.t()
+            # remove the ones which will already be kept
+            corr *= (keep_mask == 0).float()
+            # get kth value, based on how many weights to add, and calculate mask
+            kth = int(np.prod(corr.shape) - num_add)
+            # contiguous()
+            corr_threshold, _ = torch.kthvalue(corr.contiguous().view(-1), kth)
+            add_mask = (corr > corr_threshold).to(self.device)
+
+            new_mask = keep_mask | add_mask
+            self.log["added_synapses_l" + str(idx)] = torch.sum(add_mask).item()
+
+        # track added connections
+        return new_mask, keep_mask, add_mask
+
+    def reinitialize_weights(self):
+        """Reinitialize weights."""
+        # only run if still learning. method will be called but do nothing
+        if self.pruning_active:
+
+            for idx, (m, grad, corr) in enumerate(zip(self.sparse_modules, self.last_gradients, self.network.correlations)):
+                new_mask, keep_mask, new_synapses = self.prune(
+                    m.weight.clone().detach(), grad, self.num_params[idx], corr, idx=idx
+                )
+                with torch.no_grad():
+                    self.masks[idx] = new_mask.float()
+                    m.weight.data *= keep_mask.float()
+
+                    # keep track of added synapes
+                    survival_ratios = []
+
+                    # count how many synapses from last round have survived
+                    if self.added_synapses[idx] is not None:
+                        total_added = torch.sum(self.added_synapses[idx]).item()
+                        surviving = torch.sum(
+                            self.added_synapses[idx] & keep_mask
+                        ).item()
+                        if total_added:
+                            survival_ratio = (surviving / total_added)
+                            survival_ratios.append(survival_ratio)
+                            # log if in debug sparse mode
+                            if self.debug_sparse:
+                                self.log["surviving_synapses_l" + str(idx)] = survival_ratio
+
+                    # keep track of new synapses to count surviving on next round
+                    self.added_synapses[idx] = new_synapses
+
+            # early stop
+            if self.pruning_early_stop:
+                if np.mean(survival_ratios) < self.pruning_early_stop_threshold:
+                    self.pruning_active = False 
+
+            # keep track of mask sizes when debugging
+            if self.debug_sparse:
+                for idx, m in enumerate(self.masks):
+                    self.log["mask_sizes_l" + str(idx)] = torch.sum(m).item()
+
