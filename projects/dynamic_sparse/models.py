@@ -19,7 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from collections import defaultdict
+from collections import defaultdict, deque
 
 import numpy as np
 import torch
@@ -50,7 +50,8 @@ class BaseModel:
             test_noise=False,
             percent_on=0.3,
             boost_strength=1.4,
-            boost_strength_factor=0.7,            
+            boost_strength_factor=0.7,
+            weight_decay=1e-4       
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -69,7 +70,7 @@ class BaseModel:
         elif self.optim_alg == "SGD":
             # added weight decay
             self.optimizer = optim.SGD(
-                self.network.parameters(), lr=self.learning_rate, momentum=self.momentum, weight_decay=2e-4
+                self.network.parameters(), lr=self.learning_rate, momentum=self.momentum, weight_decay=self.weight_decay
             )
 
         # add a learning rate scheduler
@@ -543,31 +544,35 @@ class DSNNHeb(SparseModel):
         self.added_synapses = [None for m in self.masks]
         self.last_gradients = [None for m in self.masks]
 
-        # initializae sign to 1 if to be flipped later
-        self.prune_grad_sign = -1
-        if self.flip:
-            self.prune_grad_sign = 1
-            self.flip_epoch = 30
-
-        # initialize hebbian learning
-        self.network.hebbian_learning = True
+        # # initializae sign to 1 if to be flipped later
+        # self.prune_grad_sign = -1
+        # if self.flip:
+        #     self.prune_grad_sign = 1
+        #     self.flip_epoch = 30
 
         # add specific defaults
         new_defaults = (dict(
             pruning_active=True,
-            # pruning_early_stop=True,
+            pruning_early_stop=True,
+            pruning_early_stop_tolerance=6,
             pruning_early_stop_threshold=0.02,
+            hebbian_prune_perc=0
         ))
         new_defaults = {k:v for k,v in new_defaults.items() if k not in self.__dict__ }
         self.__dict__.update(new_defaults)
+
+        # initialize hebbian learning
+        self.network.hebbian_learning = True
+        self.last_survival_ratios = deque(maxlen=self.pruning_early_stop_tolerance)
+
 
     def _post_epoch_updates(self, dataset=None):
         super(DSNNHeb, self)._post_epoch_updates(dataset)
 
         # flip at a fixed interval
-        if self.flip:
-            if self.current_epoch == self.flip_epoch and self.prune_grad_sign == 1:
-                self.prune_grad_sign = -1
+        # if self.flip:
+        #     if self.current_epoch == self.flip_epoch and self.prune_grad_sign == 1:
+        #         self.prune_grad_sign = -1
 
         # zero out correlations
         self.network.correlations = []
@@ -697,6 +702,9 @@ class DSNNHeb(SparseModel):
         # only run if still learning. method will be called but do nothing
         if self.pruning_active:
 
+            # keep track of added synapes
+            survival_ratios = []
+
             for idx, (m, grad, corr) in enumerate(zip(self.sparse_modules, self.last_gradients, self.network.correlations)):
                 new_mask, keep_mask, new_synapses = self.prune(
                     m.weight.clone().detach(), grad, self.num_params[idx], corr, idx=idx
@@ -705,8 +713,6 @@ class DSNNHeb(SparseModel):
                     self.masks[idx] = new_mask.float()
                     m.weight.data *= keep_mask.float()
 
-                    # keep track of added synapes
-                    survival_ratios = []
 
                     # count how many synapses from last round have survived
                     if self.added_synapses[idx] is not None:
@@ -715,7 +721,7 @@ class DSNNHeb(SparseModel):
                             self.added_synapses[idx] & keep_mask
                         ).item()
                         if total_added:
-                            survival_ratio = (surviving / total_added)
+                            survival_ratio = surviving / total_added
                             survival_ratios.append(survival_ratio)
                             # log if in debug sparse mode
                             if self.debug_sparse:
@@ -725,12 +731,96 @@ class DSNNHeb(SparseModel):
                     self.added_synapses[idx] = new_synapses
 
             # early stop
-            if self.pruning_early_stop:
-                if np.mean(survival_ratios) < self.pruning_early_stop_threshold:
-                    self.pruning_active = False 
+            # alternative - keep a moving average
+            mean_survival_ratio = np.mean(survival_ratios[:-1]) # ignore the last layer for now
+            if not np.isnan(mean_survival_ratio):
+                self.last_survival_ratios.append(mean_survival_ratio)
+                if self.debug_sparse:
+                    self.log["surviving_synapses_avg"] = mean_survival_ratio
+                if self.pruning_early_stop:
+                    ma_survival = np.sum(list(self.last_survival_ratios)) / self.pruning_early_stop_tolerance
+                    if ma_survival < self.pruning_early_stop_threshold:
+                        self.pruning_active = False
 
             # keep track of mask sizes when debugging
             if self.debug_sparse:
                 for idx, m in enumerate(self.masks):
                     self.log["mask_sizes_l" + str(idx)] = torch.sum(m).item()
 
+
+class DSNNFullHeb(DSNNHeb):
+
+    def setup(self):
+        super(DSNNFullHeb, self).setup()
+        # override
+        self.hebbian_prune_perc = 0.30
+        self.weight_prune_perc = 0.00 # 0 to 0.45, with avg 0.20 actual chance of pruning
+
+    def prune(self, weight, grad, num_params, corr, idx=0):
+        """
+        Calculate new weight based on SET approach weight vectorized version
+        aimed at keeping the mask with the similar level of sparsity.
+
+        Changes:
+        - higher zeta
+        - two masks: one based on weights, another based on gradients
+
+        Have access to correlation 
+        Error added contiguous to fix
+        RuntimeError: invalid argument 2: view size is not compatible with input tensor's size and stride (at least one dimension spans across two contiguous subspaces). Call .contiguous() before .view(). at /pytorch/aten/src/THC/generic/THCTensor.cpp:209
+        """
+        with torch.no_grad():
+
+            # transpose to fit the weights
+            corr = corr.t()
+
+            tau = self.hebbian_prune_perc            
+            # decide which weights to remove based on correlation
+            kth = int((1-tau)*np.prod(corr.shape))
+            corr_threshold, _ = torch.kthvalue(corr.contiguous().view(-1), kth)
+            hebbian_keep_mask = (corr > corr_threshold).to(self.device)
+
+            # calculate weight mask
+            zeta = self.weight_prune_perc
+            weight_pos = weight[weight > 0]
+            pos_threshold, _ = torch.kthvalue(
+                weight_pos, max(int(zeta * len(weight_pos)), 1)
+            )
+            weight_neg = weight[weight < 0]
+            neg_threshold, _ = torch.kthvalue(
+                weight_neg, max(int((1 - zeta) * len(weight_neg)), 1)
+            )
+            weight_keep_mask = (weight >= pos_threshold) | (weight <= neg_threshold)
+            weight_keep_mask.to(self.device)
+
+            # no gradient mask, just a keep mask
+            keep_mask = weight_keep_mask & hebbian_keep_mask
+            self.log["weight_keep_mask_l" + str(idx)] = torch.sum(
+                keep_mask
+            ).item()
+
+            # calculate number of parameters to add
+            num_add = num_params - torch.sum(keep_mask).item()
+            self.log["missing_weights_l" + str(idx)] = num_add            
+            # remove the ones which will already be kept
+            corr *= (keep_mask == 0).float()
+            # get kth value, based on how many weights to add, and calculate mask
+            kth = int(np.prod(corr.shape) - num_add)
+            # contiguous()
+            corr_threshold, _ = torch.kthvalue(corr.contiguous().view(-1), kth)
+            add_mask = (corr > corr_threshold).to(self.device)
+
+            new_mask = keep_mask | add_mask
+            self.log["added_synapses_l" + str(idx)] = torch.sum(add_mask).item()
+
+        # track added connections
+        return new_mask, keep_mask, add_mask
+
+
+class DSNNMixedHeb(DSNNFullHeb):
+
+    def setup(self):
+        super(DSNNMixedHeb, self).setup()
+        # override
+        self.hebbian_prune_perc = 0.45
+        self.weight_prune_perc = 0.45 # 0 to 0.45, with avg 0.20 actual chance of pruning

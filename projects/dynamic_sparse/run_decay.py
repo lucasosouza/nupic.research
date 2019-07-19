@@ -36,8 +36,9 @@ exp_config = dict(
     device="cuda",
     network="MLPHeb",
     num_classes=10,
-    model="DSNNHeb",
+    # model="DSNNHeb",
     # model="BaseModel",
+    model=tune.grid_search(["DSNN"]),
     dataset_name="CIFAR10",
     input_size=3072,
     stats_mean=(0.4914, 0.4822, 0.4465),
@@ -67,7 +68,7 @@ exp_config = dict(
     # test_noise=True,
     # noise_level=0.1,
     kwinners=True,  # moved to a parameter
-    pruning_early_stop=tune.grid_search([True, False]),
+    # pruning_early_stop=tune.grid_search([True, False]),
 )
 
 tune_config = dict(
@@ -78,7 +79,7 @@ tune_config = dict(
     checkpoint_freq=0,
     checkpoint_at_end=False,
     stop={"training_iteration": 1000}, # 300 in cifar
-    resources_per_trial={"cpu": 1, "gpu": .5},
+    resources_per_trial={"cpu": 1, "gpu": 1},
     loggers=DEFAULT_LOGGERS,
     verbose=1,
 )

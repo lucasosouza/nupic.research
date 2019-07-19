@@ -36,8 +36,9 @@ exp_config = dict(
     device="cuda",
     network="MLPHeb",
     num_classes=10,
-    model=tune.grid_search(["BaseModel", "SparseModel", "DSNN", "DSNNHeb"]),
+    model=tune.grid_search(["SET", "DSNNHeb", "DSNNFullHeb", "DSNNMixedHeb"]),
     # model="BaseModel",
+    # model="DSNNMixedHeb",
     dataset_name="CIFAR10",
     input_size=3072,
     stats_mean=(0.4914, 0.4822, 0.4465),
@@ -48,25 +49,28 @@ exp_config = dict(
     optim_alg="SGD",
     momentum=0.9,
     learning_rate=0.01,
-    dropout=False, # only difference from original
+    dropout=False,
+    weight_decay=1e-4,
     # lr_scheduler="MultiStepLR",
     # lr_milestones=[250, 290],
     # lr_milestones=[250, 290],
     # lr_gamma=0.10,
-    debug_weights=True,
     # sparse related
     epsilon=100,
     start_sparse=1,
     end_sparse=None,
-    debug_sparse=True,
     weight_prune_perc=0.3,
-    grad_prune_perc=0,
     percent_on=0.3,
     boost_strength=1.4,
     boost_strength_factor=0.7,
+    kwinners=True, 
+    pruning_early_stop_tolerance=6,
+    pruning_early_stop_threshold=0.02,
     # test_noise=True,
     # noise_level=0.1,
-    kwinners=True,  # moved to a parameter
+    # debugging
+    debug_weights=True,
+    debug_sparse=True,
 )
 
 tune_config = dict(
