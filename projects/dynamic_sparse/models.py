@@ -754,7 +754,65 @@ class DSNNFullHeb(DSNNHeb):
         super(DSNNFullHeb, self).setup()
         # override
         self.hebbian_prune_perc = 0.30
-        self.weight_prune_perc = 0.00 # 0 to 0.45, with avg 0.20 actual chance of pruning
+
+    def prune(self, weight, grad, num_params, corr, idx=0):
+        """
+        Calculate new weight based on SET approach weight vectorized version
+        aimed at keeping the mask with the similar level of sparsity.
+
+        Changes:
+        - higher zeta
+        - two masks: one based on weights, another based on gradients
+
+        Have access to correlation 
+        Error added contiguous to fix
+        RuntimeError: invalid argument 2: view size is not compatible with input tensor's size and stride (at least one dimension spans across two contiguous subspaces). Call .contiguous() before .view(). at /pytorch/aten/src/THC/generic/THCTensor.cpp:209
+        """
+        with torch.no_grad():
+
+            # transpose to fit the weights
+            corr = corr.t()
+
+            tau = self.hebbian_prune_perc            
+            # decide which weights to remove based on correlation
+            kth = int((1-tau)*np.prod(corr.shape))
+            corr_threshold, _ = torch.kthvalue(corr.contiguous().view(-1), kth)
+            hebbian_keep_mask = (corr > corr_threshold).to(self.device)
+
+            # just get the active ones
+            weight_keep_mask = (weight > 0).to(self.device)
+
+            # no gradient mask, just a keep mask
+            keep_mask = hebbian_keep_mask & weight_keep_mask
+            self.log["weight_keep_mask_l" + str(idx)] = torch.sum(
+                keep_mask
+            ).item()
+
+            # calculate number of parameters to add
+            num_add = max(num_params - torch.sum(keep_mask).item(), 0) # TODO: debug why < 0
+            self.log["missing_weights_l" + str(idx)] = num_add            
+            # remove the ones which will already be kept
+            corr *= (keep_mask == 0).float()
+            # get kth value, based on how many weights to add, and calculate mask
+            kth = int(np.prod(corr.shape) - num_add)
+            # contiguous()
+            corr_threshold, _ = torch.kthvalue(corr.contiguous().view(-1), kth)
+            add_mask = (corr > corr_threshold).to(self.device)
+
+            new_mask = keep_mask | add_mask
+            self.log["added_synapses_l" + str(idx)] = torch.sum(add_mask).item()
+
+        # track added connections
+        return new_mask, keep_mask, add_mask
+
+
+class DSNNMixedHeb(DSNNFullHeb):
+
+    def setup(self):
+        super(DSNNMixedHeb, self).setup()
+        # override
+        self.hebbian_prune_perc = 0.45
+        self.weight_prune_perc = 0.45 # 0 to 0.45, with avg 0.20 actual chance of pruning
 
     def prune(self, weight, grad, num_params, corr, idx=0):
         """
@@ -800,7 +858,7 @@ class DSNNFullHeb(DSNNHeb):
             ).item()
 
             # calculate number of parameters to add
-            num_add = num_params - torch.sum(keep_mask).item()
+            num_add = max(num_params - torch.sum(keep_mask).item(), 0) # TODO: debug why < 0
             self.log["missing_weights_l" + str(idx)] = num_add            
             # remove the ones which will already be kept
             corr *= (keep_mask == 0).float()
@@ -817,10 +875,3 @@ class DSNNFullHeb(DSNNHeb):
         return new_mask, keep_mask, add_mask
 
 
-class DSNNMixedHeb(DSNNFullHeb):
-
-    def setup(self):
-        super(DSNNMixedHeb, self).setup()
-        # override
-        self.hebbian_prune_perc = 0.45
-        self.weight_prune_perc = 0.45 # 0 to 0.45, with avg 0.20 actual chance of pruning

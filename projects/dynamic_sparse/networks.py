@@ -169,7 +169,7 @@ class VGG19(nn.Module):
                 m.bias.data.zero_()
 
 
-class VGG19Small(nn.Module):
+class VGG19Heb(nn.Module):
     def __init__(self, config=None):
         super(VGG19Small, self).__init__()
 
@@ -185,7 +185,8 @@ class VGG19Small(nn.Module):
             kwinners=False,
             percent_on=0.3,
             boost_strength=1.4,
-            boost_strength_factor=0.7,            
+            boost_strength_factor=0.7,
+            hebbian_learning=True       
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -236,31 +237,56 @@ class VGG19Small(nn.Module):
             block.append(self.pool_func())
         return block
 
+        # track correlations
+        self.correlations = []     
+
+
+    def _has_activation(self, idx, layer):
+        """ Will only capture """ 
+        return idx == len(self.layers)-1 or isinstance(layer, nn.ReLU) or isinstance(layer, KWinners)
+
     def forward(self, x):
-        idx = 0
-        for layer in self.classifier:
-            if not (isinstance(layer, Flatten) or isinstance(layer, nn.AvgPool2d) or isinstance(layer, nn.BatchNorm2d)):                
-                x = layer(x)
-                print(layer.__class__)
-                if idx == 0:
-                    # clone and detach x
-                    # sum over batch, interested in correlation between neurons
-                    prev_act = torch.sum(x.clone().detach(), dim=0).view(-1)
-                # from the second layer
-                else:
-                    curr_act = torch.sum(x.clone().detach(), dim=0).view(-1)
-                    # only append correlation if it is a layer with weights
-                    if isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear):
-                        curr_act = torch.sum(x.clone().detach(), dim=0).view(-1)
-                        # get the outer product, square root to control growth
-                        outer_product = torch.sqrt(torch.ger(prev_act, curr_act))
-                        # if non existing, append
-                        if idx > len(self.correlations):
-                            self.correlations.append(outer_product)
+        """ Same idea as in MLP
+        TODO: only get the receptive field - need to find the reverse heuristic to get the right activations
+        considering there is likely padding as well
+        """
+
+        x = x.view(-1, self.input_size) # resiaze if needed, eg mnist
+        prev_act = (x > 0).detach().float()
+        idx_activation = 0
+        for idx_layer, layer in enumerate(self.layers):
+            # do the forward calculation normally
+            x = layer(x)
+            if self.hebbian_learning:
+                n_samples = x.shape[0]
+                if self._has_activation(idx_layer, layer):
+                    with torch.no_grad():
+                        curr_act = (x > 0).detach().float()
+                        correlations = torch.zeros(prev_act.shape)
+                        # loop across samples
+                        for s in range(n_samples):
+                            # loop across channels
+                            for c in range(curr_act.shape[1]):
+                            for x in range(curr_act.shape[2]):
+                                for y in range(curr_act.shape[3]):
+                                    # TODO: only get the receptive field
+                                    x_range, y_range = None, None
+                                    # multiply the receptive field by the value in x,y, and sum
+                                    joint_act = prev_act[s, x_range, y_range, :] * curr_act[s, x, y, c]
+                                    correlations[s, x_range, y_range, :] += joint_act
+
+                        # at the end, sum over all samples
+                        correlations_total = torch.sum(activations, dim=0)
+                        # update corre
+                        if idx_activation+1 > len(self.correlations):
+                            self.correlations.append(correlations_total)
                         else:
-                            self.correlations[idx-1] += outer_product
-                    prev_act = curr_act
-                idx += 1
+                            self.correlations[idx_activation] += correlations_total
+
+                        # reassing to the next
+                        prev_act = curr_act
+                        # move to next activation
+                        idx_activation += 1
 
         return x
 
@@ -362,8 +388,6 @@ class MLP(nn.Module):
                     nn.init.constant_(m.bias, 0)
 
 
-
-
 class MLPHeb(nn.Module):
     """
     Simple 3 hidden layers + output MLPHeb, similar to one used in SET Paper.
@@ -431,7 +455,7 @@ class MLPHeb(nn.Module):
         return idx == len(self.layers)-1 or isinstance(layer, nn.ReLU) or isinstance(layer, KWinners)
 
     def forward(self, x):
-        """ A smarter way of building it """
+        """ A faster way of building it """
 
         x = x.view(-1, self.input_size) # resiaze if needed, eg mnist
         prev_act = (x > 0).detach().float()
