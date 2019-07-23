@@ -24,10 +24,12 @@ import os
 import ray
 import ray.tune as tune
 import torch
-torch.manual_seed(32)
 
 from loggers import DEFAULT_LOGGERS
 from utils import Trainable, download_dataset, new_experiment, run_experiment
+
+torch.manual_seed(32)
+
 
 # experiment configurations
 base_exp_config = dict(
@@ -45,7 +47,7 @@ base_exp_config = dict(
     init_weights=True,
     batch_norm=True,
     dropout=False,
-    kwinners=True, 
+    kwinners=True,
     percent_on=0.3,
     boost_strength=1.4,
     boost_strength_factor=0.7,
@@ -58,8 +60,8 @@ base_exp_config = dict(
     epsilon=100,
     start_sparse=1,
     end_sparse=None,
-    weight_prune_perc= 0.45,
-    hebbian_prune_perc= 0.45,
+    weight_prune_perc=0.45,
+    hebbian_prune_perc=0.45,
     pruning_es=True,
     pruning_es_patience=0,
     pruning_es_window_size=5,
@@ -80,31 +82,34 @@ tune_config = dict(
     local_dir=os.path.expanduser("~/nta/results"),
     checkpoint_freq=0,
     checkpoint_at_end=False,
-    stop={"training_iteration": 1000}, # 300 in cifar
-    resources_per_trial={"cpu": 1, "gpu": .33},
+    stop={"training_iteration": 1000},  # 300 in cifar
+    resources_per_trial={"cpu": 1, "gpu": 0.33},
     loggers=DEFAULT_LOGGERS,
     verbose=1,
 )
 
 # define experiments
 experiments = {
-    'baselines': dict(
+    "baselines": dict(
         model=tune.grid_search(["BaseModel", "SparseModel", "DSNN"]),
-        weight_prune_perc=0.3, 
-    ), # 3
-    'mixed_hebbian_gs': dict(
-        weight_prune_perc=tune.grid_search([0.15,0.30,0.45,0.60]),
-        hebbian_prune_perc=tune.grid_search([0.15,0.30,0.45,0.60]),
-    ), # 16
-    'epsilons': dict(epsilon=tune.grid_search([30,200])), # 2
-    'spaced_updates': dict(pruning_interval=tune.grid_search([2,4,8,16,32])), # 5
-    'es_strategies': dict(pruning_es_patience=tune.grid_search([2, 1000])), # 2
+        weight_prune_perc=0.3,
+    ),  # 3
+    "mixed_hebbian_gs": dict(
+        weight_prune_perc=tune.grid_search([0.15, 0.30, 0.45, 0.60]),
+        hebbian_prune_perc=tune.grid_search([0.15, 0.30, 0.45, 0.60]),
+    ),  # 16
+    "epsilons": dict(epsilon=tune.grid_search([30, 200])),  # 2
+    "spaced_updates": dict(pruning_interval=tune.grid_search([2, 4, 8, 16, 32])),  # 5
+    "es_strategies": dict(pruning_es_patience=tune.grid_search([2, 1000])),  # 2
 }
-exp_configs = [(name, new_experiment(base_exp_config, c)) for name,c in experiments.items()]
+exp_configs = [
+    (name, new_experiment(base_exp_config, c)) for name, c in experiments.items()
+]
 
 # run all experiments in parallel
 ray.init()
-results = [run_experiment.remote(name, Trainable, c, tune_config) for name,c in exp_configs]
+results = [
+    run_experiment.remote(name, Trainable, c, tune_config) for name, c in exp_configs
+]
 ray.get(results)
 ray.shutdown()
-

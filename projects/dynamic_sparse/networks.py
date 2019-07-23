@@ -20,14 +20,13 @@
 # ----------------------------------------------------------------------
 
 import math
+from collections import defaultdict
 
 import torch
 from torch import nn
 from torchvision import models
 
-from nupic.torch.modules import Flatten, KWinners2d, KWinners
-
-from collections import defaultdict
+from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
 
 class VGG19(nn.Module):
@@ -35,7 +34,7 @@ class VGG19(nn.Module):
         super(VGG19, self).__init__()
 
         defaults = dict(
-            device='gpu',
+            device="gpu",
             input_size=784,
             num_classes=10,
             hidden_sizes=[4000, 1000, 4000],
@@ -45,7 +44,6 @@ class VGG19(nn.Module):
             init_weights=True,
             kwinners=False,
             percent_on=0.3,
-
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -127,7 +125,7 @@ class VGG19Heb(nn.Module):
         super(VGG19Small, self).__init__()
 
         defaults = dict(
-            device='gpu',
+            device="gpu",
             input_size=784,
             num_classes=10,
             hidden_sizes=[4000, 1000, 4000],
@@ -139,7 +137,7 @@ class VGG19Heb(nn.Module):
             percent_on=0.3,
             boost_strength=1.4,
             boost_strength_factor=0.7,
-            hebbian_learning=True       
+            hebbian_learning=True,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -155,9 +153,9 @@ class VGG19Heb(nn.Module):
 
         # initialize network
         layers = [
-            *self._conv_block(3, 64, pool=True),     # 16x16
-            *self._conv_block(64, 64, pool=True),     # 8x8
-            *self._conv_block(64, 128, pool=True),   # 4x4
+            *self._conv_block(3, 64, pool=True),  # 16x16
+            *self._conv_block(64, 64, pool=True),  # 8x8
+            *self._conv_block(64, 128, pool=True),  # 4x4
             *self._conv_block(128, 256, pool=True),  # 2x2
             *self._conv_block(256, 512, pool=True),  # 1x1
         ]
@@ -191,12 +189,15 @@ class VGG19Heb(nn.Module):
         return block
 
         # track correlations
-        self.correlations = []     
-
+        self.correlations = []
 
     def _has_activation(self, idx, layer):
-        """ Will only capture """ 
-        return idx == len(self.layers)-1 or isinstance(layer, nn.ReLU) or isinstance(layer, KWinners)
+        """ Will only capture """
+        return (
+            idx == len(self.layers) - 1
+            or isinstance(layer, nn.ReLU)
+            or isinstance(layer, KWinners)
+        )
 
     def forward(self, x):
         """ Same idea as in MLP
@@ -205,7 +206,7 @@ class VGG19Heb(nn.Module):
 
         Sample implementation, not tested
         """
-        x = x.view(-1, self.input_size) # resiaze if needed, eg mnist
+        x = x.view(-1, self.input_size)  # resiaze if needed, eg mnist
         prev_act = (x > 0).detach().float()
         idx_activation = 0
         for idx_layer, layer in enumerate(self.layers):
@@ -226,13 +227,18 @@ class VGG19Heb(nn.Module):
                                         # TODO: only get the receptive field
                                         x_range, y_range = None, None
                                         # multiply the receptive field by the value in x,y, and sum
-                                        joint_act = prev_act[s, x_range, y_range, :] * curr_act[s, x, y, c]
-                                        correlations[s, x_range, y_range, :] += joint_act
+                                        joint_act = (
+                                            prev_act[s, x_range, y_range, :]
+                                            * curr_act[s, x, y, c]
+                                        )
+                                        correlations[
+                                            s, x_range, y_range, :
+                                        ] += joint_act
 
                         # at the end, sum over all samples
                         correlations_total = torch.sum(correlations, dim=0)
                         # update corre
-                        if idx_activation+1 > len(self.correlations):
+                        if idx_activation + 1 > len(self.correlations):
                             self.correlations.append(correlations_total)
                         else:
                             self.correlations[idx_activation] += correlations_total
@@ -358,7 +364,7 @@ class MLPHeb(nn.Module):
             dropout=False,
             bias=False,
             init_weights=True,
-            hebbian_learning=False
+            hebbian_learning=False,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -386,7 +392,7 @@ class MLPHeb(nn.Module):
             self._initialize_weights(self.bias)
 
         # track correlations
-        self.correlations = []     
+        self.correlations = []
 
     def _kwinners(self, fout):
         return KWinners(
@@ -406,12 +412,16 @@ class MLPHeb(nn.Module):
         return block
 
     def _has_activation(self, idx, layer):
-        return idx == len(self.layers)-1 or isinstance(layer, nn.ReLU) or isinstance(layer, KWinners)
+        return (
+            idx == len(self.layers) - 1
+            or isinstance(layer, nn.ReLU)
+            or isinstance(layer, KWinners)
+        )
 
     def forward(self, x):
         """ A faster way of building it """
 
-        x = x.view(-1, self.input_size) # resiaze if needed, eg mnist
+        x = x.view(-1, self.input_size)  # resiaze if needed, eg mnist
         prev_act = (x > 0).detach().float()
         idx_activation = 0
         for idx_layer, layer in enumerate(self.layers):
@@ -425,7 +435,7 @@ class MLPHeb(nn.Module):
                         # add outer product to the correlations, per sample
                         for s in range(n_samples):
                             outer = torch.ger(prev_act[s], curr_act[s])
-                            if idx_activation+1 > len(self.correlations):
+                            if idx_activation + 1 > len(self.correlations):
                                 self.correlations.append(outer)
                             else:
                                 self.correlations[idx_activation] += outer
@@ -493,5 +503,3 @@ def resnet18(config):
 
 def resnet50(config):
     return models.resnet50(num_classes=config["num_classes"])
-
-

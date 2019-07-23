@@ -55,4 +55,3 @@ tune.run(
     stop={"training_iteration": 10},
     resources_per_trial={"cpu": 1, "gpu": 0},
 )
-
