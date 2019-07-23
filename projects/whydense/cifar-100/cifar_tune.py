@@ -32,6 +32,10 @@ from torchvision import datasets
 
 from cifar_experiment import TinyCIFAR  # changed to local
 
+# added to test elastic search logger
+from nupic.research.support.elastic_logger import ElasticsearchLogger
+from ray.tune.logger import CSVLogger, JsonLogger, Logger
+
 # Remove annoying messages saying training is taking too long
 logging.getLogger("ray.tune.util").setLevel(logging.ERROR)
 
@@ -148,6 +152,7 @@ def run_experiment(config, trainable):
             "cpu": config.get("cpu_percentage", 1.0),
             "gpu": config.get("gpu_percentage", 1.0),
         },
+        loggers=[CSVLogger, JsonLogger, Logger, ElasticsearchLogger]
         # # added parameters to allow monitoring through REST API
         # with_server=True,
         # server_port=4321,
@@ -270,7 +275,7 @@ if __name__ == "__main__":
         dataset = config.get("dataset", "CIFAR10")
         if not hasattr(datasets, dataset):
             print("Dataset {} not available in PyTorch".format(dataset))
-        getattr(datasets, dataset)(root=data_dir)
+        getattr(datasets, dataset)(root=data_dir, download=True)
 
         # When running multiple hyperparameter searches on different experiments,
         # ray.tune will run one experiment at the time. We use "ray.remote" to
