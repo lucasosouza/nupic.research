@@ -354,28 +354,19 @@ class SET(SparseModel):
 
 class DSNN(SparseModel):
     """
-    Dynamically sparse neural networks.
-    Our improved version of SET
+    Dynamically sparse neural networks, our improved version of SET
+    At weight gradient prune = 0.3, should be identical to SET implementation
     """
 
     def setup(self):
         super(DSNN, self).setup()
+        # tracking added synapses to monitor survival ration
         self.added_synapses = [None for m in self.masks]
+        # tracking the gradients to help in pruning - not required in current method
         self.last_gradients = [None for m in self.masks]
-
-        # initializae sign to 1 if to be flipped later
-        self.prune_grad_sign = -1
-        if self.flip:
-            self.prune_grad_sign = 1
-            self.flip_epoch = 30
 
     def _post_epoch_updates(self, dataset=None):
         super(DSNN, self)._post_epoch_updates(dataset)
-
-        # flip at a fixed interval
-        if self.flip:
-            if self.current_epoch == self.flip_epoch and self.prune_grad_sign == 1:
-                self.prune_grad_sign = -1
 
         # update only when learning rate updates
         # froze this for now
@@ -448,10 +439,6 @@ class DSNN(SparseModel):
         """
         Calculate new weight based on SET approach weight vectorized version
         aimed at keeping the mask with the similar level of sparsity.
-
-        Changes:
-        - higher zeta
-        - two masks: one based on weights, another based on gradients
         """
         with torch.no_grad():
 
@@ -471,18 +458,8 @@ class DSNN(SparseModel):
                 weight_keep_mask
             ).item()
 
-            # calculate gradient mask
-            kappa = self.grad_prune_perc
-            grad = grad * self.prune_grad_sign * torch.sign(weight)
-            deltas = grad.view(-1)
-            grad_treshold, _ = torch.kthvalue(deltas, max(int(kappa * len(deltas)), 1))
-            grad_keep_mask = (grad >= grad_treshold).to(self.device)
-            # keep only those which are in the original weight matrix
-            grad_keep_mask = grad_keep_mask & (weight != 0)
-            self.log["grad_keep_mask_l" + str(idx)] = torch.sum(grad_keep_mask).item()
-
             # combine both masks
-            keep_mask = weight_keep_mask & grad_keep_mask
+            keep_mask = weight_keep_mask
 
             # change mask to add new weight
             num_add = num_params - torch.sum(keep_mask).item()
@@ -510,10 +487,6 @@ class DSNN(SparseModel):
 
                 # keep track of added synapes
                 if self.debug_sparse:
-                    # count new synapses at this round
-                    # total_new = torch.sum(new_synapses).item()
-                    # total = np.prod(new_synapses.shape)
-                    # self.log["added_synapses_l" + str(idx)] = total_new
                     # count how many synapses from last round have survived
                     if self.added_synapses[idx] is not None:
                         total_added = torch.sum(self.added_synapses[idx]).item()
@@ -535,8 +508,11 @@ class DSNN(SparseModel):
 
 class DSNNHeb(SparseModel):
     """
-    Dynamically sparse neural networks.
-    Our improved version of SET
+    DSNNHeb
+    Grow: by correlation
+    Prune: by magnitude
+
+    Improved results compared to regular SET
     """
 
     def setup(self):
@@ -553,17 +529,21 @@ class DSNNHeb(SparseModel):
         # add specific defaults
         new_defaults = (dict(
             pruning_active=True,
-            pruning_early_stop=True,
-            pruning_early_stop_tolerance=6,
-            pruning_early_stop_threshold=0.02,
-            hebbian_prune_perc=0
+            pruning_es=True,
+            pruning_es_patience=0,
+            pruning_es_window_size=6,
+            pruning_es_threshold=0.02,
+            pruning_interval=1,
+            hebbian_prune_perc=0,
         ))
         new_defaults = {k:v for k,v in new_defaults.items() if k not in self.__dict__ }
         self.__dict__.update(new_defaults)
 
         # initialize hebbian learning
         self.network.hebbian_learning = True
-        self.last_survival_ratios = deque(maxlen=self.pruning_early_stop_tolerance)
+        # count number of cycles, compare with patience
+        self.pruning_es_cycles = 0
+        self.last_survival_ratios = deque(maxlen=self.pruning_es_window_size)
 
 
     def _post_epoch_updates(self, dataset=None):
@@ -649,10 +629,6 @@ class DSNNHeb(SparseModel):
         Calculate new weight based on SET approach weight vectorized version
         aimed at keeping the mask with the similar level of sparsity.
 
-        Changes:
-        - higher zeta
-        - two masks: one based on weights, another based on gradients
-
         Have access to correlation 
         Error added contiguous to fix
         RuntimeError: invalid argument 2: view size is not compatible with input tensor's size and stride (at least one dimension spans across two contiguous subspaces). Call .contiguous() before .view(). at /pytorch/aten/src/THC/generic/THCTensor.cpp:209
@@ -699,8 +675,9 @@ class DSNNHeb(SparseModel):
 
     def reinitialize_weights(self):
         """Reinitialize weights."""
-        # only run if still learning. method will be called but do nothing
-        if self.pruning_active:
+        # only run if still learning and if at the right interval
+        # current epoch is 1-based indexed
+        if self.pruning_active and (self.current_epoch % self.pruning_interval) == 0 :
 
             # keep track of added synapes
             survival_ratios = []
@@ -737,9 +714,15 @@ class DSNNHeb(SparseModel):
                 self.last_survival_ratios.append(mean_survival_ratio)
                 if self.debug_sparse:
                     self.log["surviving_synapses_avg"] = mean_survival_ratio
-                if self.pruning_early_stop:
-                    ma_survival = np.sum(list(self.last_survival_ratios)) / self.pruning_early_stop_tolerance
-                    if ma_survival < self.pruning_early_stop_threshold:
+                if self.pruning_es:
+                    ma_survival = np.sum(list(self.last_survival_ratios)) / self.pruning_es_window_size
+                    # if moving average of survival is less than the threshold
+                    if ma_survival < self.pruning_es_threshold:
+                        # count an additional cycle, and reset moving average
+                        self.pruning_es_cycles += 1
+                        self.last_survival_ratios.clear()
+                    # if number of cycles is greater than the patience threshold, stop pruning.
+                    if self.pruning_es_cycles > self.pruning_es_patience: 
                         self.pruning_active = False
 
             # keep track of mask sizes when debugging
@@ -748,80 +731,18 @@ class DSNNHeb(SparseModel):
                     self.log["mask_sizes_l" + str(idx)] = torch.sum(m).item()
 
 
-class DSNNFullHeb(DSNNHeb):
+class DSNNMixedHeb(DSNNHeb):
+    """ MixedHeb:
+        Grow by correlation
+        Prune by correlation and magnitude 
 
-    def setup(self):
-        super(DSNNFullHeb, self).setup()
-        # override
-        self.hebbian_prune_perc = 0.30
-
-    def prune(self, weight, grad, num_params, corr, idx=0):
-        """
-        Calculate new weight based on SET approach weight vectorized version
-        aimed at keeping the mask with the similar level of sparsity.
-
-        Changes:
-        - higher zeta
-        - two masks: one based on weights, another based on gradients
-
-        Have access to correlation 
-        Error added contiguous to fix
-        RuntimeError: invalid argument 2: view size is not compatible with input tensor's size and stride (at least one dimension spans across two contiguous subspaces). Call .contiguous() before .view(). at /pytorch/aten/src/THC/generic/THCTensor.cpp:209
-        """
-        with torch.no_grad():
-
-            # transpose to fit the weights
-            corr = corr.t()
-
-            tau = self.hebbian_prune_perc            
-            # decide which weights to remove based on correlation
-            kth = int((1-tau)*np.prod(corr.shape))
-            corr_threshold, _ = torch.kthvalue(corr.contiguous().view(-1), kth)
-            hebbian_keep_mask = (corr > corr_threshold).to(self.device)
-
-            # just get the active ones
-            weight_keep_mask = (weight > 0).to(self.device)
-
-            # no gradient mask, just a keep mask
-            keep_mask = hebbian_keep_mask & weight_keep_mask
-            self.log["weight_keep_mask_l" + str(idx)] = torch.sum(
-                keep_mask
-            ).item()
-
-            # calculate number of parameters to add
-            num_add = max(num_params - torch.sum(keep_mask).item(), 0) # TODO: debug why < 0
-            self.log["missing_weights_l" + str(idx)] = num_add            
-            # remove the ones which will already be kept
-            corr *= (keep_mask == 0).float()
-            # get kth value, based on how many weights to add, and calculate mask
-            kth = int(np.prod(corr.shape) - num_add)
-            # contiguous()
-            corr_threshold, _ = torch.kthvalue(corr.contiguous().view(-1), kth)
-            add_mask = (corr > corr_threshold).to(self.device)
-
-            new_mask = keep_mask | add_mask
-            self.log["added_synapses_l" + str(idx)] = torch.sum(add_mask).item()
-
-        # track added connections
-        return new_mask, keep_mask, add_mask
-
-
-class DSNNMixedHeb(DSNNFullHeb):
-
-    def setup(self):
-        super(DSNNMixedHeb, self).setup()
-        # override
-        self.hebbian_prune_perc = 0.45
-        self.weight_prune_perc = 0.45 # 0 to 0.45, with avg 0.20 actual chance of pruning
+        Improved results compared to DSNNHeb
+    """
 
     def prune(self, weight, grad, num_params, corr, idx=0):
         """
         Calculate new weight based on SET approach weight vectorized version
         aimed at keeping the mask with the similar level of sparsity.
-
-        Changes:
-        - higher zeta
-        - two masks: one based on weights, another based on gradients
 
         Have access to correlation 
         Error added contiguous to fix

@@ -65,7 +65,3 @@ tune.run(
     resources_per_trial={"cpu": 1, "gpu": 0},
 )
 
-""""
-ongoing notes
-
-"""

@@ -30,53 +30,6 @@ from nupic.torch.modules import Flatten, KWinners2d, KWinners
 from collections import defaultdict
 
 
-def vgg19_bn(config):
-    model = models.vgg19_bn()
-    # remove all fc layers, replace for a single fc layer, from 143mi to 20mi parameters
-    model.classifier = nn.Linear(7 * 7 * 512, config["num_classes"])
-    return model
-
-
-def vgg19_bn_kw(config):
-    model = models.vgg19_bn()
-    # remove all fc layers, replace for a single fc layer, from 143mi to 20mi parameters
-    model.classifier = nn.Linear(7 * 7 * 512, config["num_classes"])
-
-    new_features = []
-    for layer in model.features:
-        # remove max pooling
-        if isinstance(layer, nn.MaxPool2d):
-            nn.AvgPool2d(kernel_size=2, stride=2)
-        # store the number of out channels from conv layers
-        elif isinstance(layer, nn.Conv2d):
-            new_features.append(layer)
-            last_conv_out_channels = layer.out_channels
-        # switch ReLU to kWinners2d
-        elif isinstance(layer, nn.ReLU):
-            new_features.append(
-                KWinners2d(
-                    channels=last_conv_out_channels,
-                    percent_on=config["percent_on"],
-                    boost_strength=config["boost_strength"],
-                    boost_strength_factor=config["boost_strength_factor"],
-                )
-            )
-        # otherwise add it as normal
-        else:
-            new_features.append(layer)
-    model.features = nn.Sequential(*new_features)
-
-    return model
-
-
-def resnet18(config):
-    return models.resnet18(num_classes=config["num_classes"])
-
-
-def resnet50(config):
-    return models.resnet50(num_classes=config["num_classes"])
-
-
 class VGG19(nn.Module):
     def __init__(self, config=None):
         super(VGG19, self).__init__()
@@ -249,8 +202,9 @@ class VGG19Heb(nn.Module):
         """ Same idea as in MLP
         TODO: only get the receptive field - need to find the reverse heuristic to get the right activations
         considering there is likely padding as well
-        """
 
+        Sample implementation, not tested
+        """
         x = x.view(-1, self.input_size) # resiaze if needed, eg mnist
         prev_act = (x > 0).detach().float()
         idx_activation = 0
@@ -267,16 +221,16 @@ class VGG19Heb(nn.Module):
                         for s in range(n_samples):
                             # loop across channels
                             for c in range(curr_act.shape[1]):
-                            for x in range(curr_act.shape[2]):
-                                for y in range(curr_act.shape[3]):
-                                    # TODO: only get the receptive field
-                                    x_range, y_range = None, None
-                                    # multiply the receptive field by the value in x,y, and sum
-                                    joint_act = prev_act[s, x_range, y_range, :] * curr_act[s, x, y, c]
-                                    correlations[s, x_range, y_range, :] += joint_act
+                                for x in range(curr_act.shape[2]):
+                                    for y in range(curr_act.shape[3]):
+                                        # TODO: only get the receptive field
+                                        x_range, y_range = None, None
+                                        # multiply the receptive field by the value in x,y, and sum
+                                        joint_act = prev_act[s, x_range, y_range, :] * curr_act[s, x, y, c]
+                                        correlations[s, x_range, y_range, :] += joint_act
 
                         # at the end, sum over all samples
-                        correlations_total = torch.sum(activations, dim=0)
+                        correlations_total = torch.sum(correlations, dim=0)
                         # update corre
                         if idx_activation+1 > len(self.correlations):
                             self.correlations.append(correlations_total)
@@ -475,8 +429,7 @@ class MLPHeb(nn.Module):
                                 self.correlations.append(outer)
                             else:
                                 self.correlations[idx_activation] += outer
-
-                        # reassing to the next
+                        # reassigning to the next
                         prev_act = curr_act
                         # move to next activation
                         idx_activation += 1
@@ -493,3 +446,52 @@ class MLPHeb(nn.Module):
                 nn.init.xavier_uniform_(m.weight)
                 if bias:
                     nn.init.constant_(m.bias, 0)
+
+
+def vgg19_bn(config):
+    model = models.vgg19_bn()
+    # remove all fc layers, replace for a single fc layer, from 143mi to 20mi parameters
+    model.classifier = nn.Linear(7 * 7 * 512, config["num_classes"])
+    return model
+
+
+def vgg19_bn_kw(config):
+    model = models.vgg19_bn()
+    # remove all fc layers, replace for a single fc layer, from 143mi to 20mi parameters
+    model.classifier = nn.Linear(7 * 7 * 512, config["num_classes"])
+
+    new_features = []
+    for layer in model.features:
+        # remove max pooling
+        if isinstance(layer, nn.MaxPool2d):
+            nn.AvgPool2d(kernel_size=2, stride=2)
+        # store the number of out channels from conv layers
+        elif isinstance(layer, nn.Conv2d):
+            new_features.append(layer)
+            last_conv_out_channels = layer.out_channels
+        # switch ReLU to kWinners2d
+        elif isinstance(layer, nn.ReLU):
+            new_features.append(
+                KWinners2d(
+                    channels=last_conv_out_channels,
+                    percent_on=config["percent_on"],
+                    boost_strength=config["boost_strength"],
+                    boost_strength_factor=config["boost_strength_factor"],
+                )
+            )
+        # otherwise add it as normal
+        else:
+            new_features.append(layer)
+    model.features = nn.Sequential(*new_features)
+
+    return model
+
+
+def resnet18(config):
+    return models.resnet18(num_classes=config["num_classes"])
+
+
+def resnet50(config):
+    return models.resnet50(num_classes=config["num_classes"])
+
+

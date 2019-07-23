@@ -24,11 +24,12 @@ import os
 from ray import tune
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
+import torch
 
 import models
 import networks
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
-
+import ray
 
 class Dataset:
     """Loads a dataset.
@@ -151,3 +152,25 @@ def download_dataset(config):
     getattr(datasets, config["dataset_name"])(
         download=True, root=os.path.expanduser(config["data_dir"])
     )
+
+def new_experiment(base_config, new_config):
+    modified_config = base_config.copy()
+    modified_config.update(new_config)
+    return modified_config
+
+@ray.remote
+def run_experiment(name, trainable, exp_config, tune_config):
+
+    # override when running local for test
+    # if not torch.cuda.is_available():
+    #     exp_config["device"] = "cpu"
+    #     tune_config["resources_per_trial"] = {"cpu": 1}
+
+    # download dataset
+    download_dataset(exp_config)
+
+    # run
+    tune_config["name"] = name
+    tune_config["config"] = exp_config
+    tune.run(Trainable, **tune_config)
+
