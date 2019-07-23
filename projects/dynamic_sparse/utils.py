@@ -22,7 +22,6 @@
 import os
 
 import ray
-import torch
 from ray import tune
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms

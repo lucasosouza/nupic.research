@@ -20,7 +20,6 @@
 # ----------------------------------------------------------------------
 
 import math
-from collections import defaultdict
 
 import torch
 from torch import nn
@@ -122,7 +121,7 @@ class VGG19(nn.Module):
 
 class VGG19Heb(nn.Module):
     def __init__(self, config=None):
-        super(VGG19Small, self).__init__()
+        super(VGG19Heb, self).__init__()
 
         defaults = dict(
             device="gpu",
@@ -164,7 +163,7 @@ class VGG19Heb(nn.Module):
         self.classifier = nn.Sequential(*layers)
 
         # track the activations
-        # should reset at the end of each round, need to find that, can be done in the model
+        # should reset at the end of each round, done in the model
         self.correlations = []
 
         if self.init_weights:
@@ -192,7 +191,6 @@ class VGG19Heb(nn.Module):
         self.correlations = []
 
     def _has_activation(self, idx, layer):
-        """ Will only capture """
         return (
             idx == len(self.layers) - 1
             or isinstance(layer, nn.ReLU)
@@ -200,9 +198,10 @@ class VGG19Heb(nn.Module):
         )
 
     def forward(self, x):
-        """ Same idea as in MLP
-        TODO: only get the receptive field - need to find the reverse heuristic to get the right activations
-        considering there is likely padding as well
+        """Same idea as in MLP
+        TODO: only get the receptive field - need to find the reverse
+        heuristic to get the right activations,considering there is likely
+        padding as well
 
         Sample implementation, not tested
         """
@@ -226,7 +225,6 @@ class VGG19Heb(nn.Module):
                                     for y in range(curr_act.shape[3]):
                                         # TODO: only get the receptive field
                                         x_range, y_range = None, None
-                                        # multiply the receptive field by the value in x,y, and sum
                                         joint_act = (
                                             prev_act[s, x_range, y_range, :]
                                             * curr_act[s, x, y, c]
@@ -419,8 +417,7 @@ class MLPHeb(nn.Module):
         )
 
     def forward(self, x):
-        """ A faster way of building it """
-
+        """A faster and approximate way to track correlations"""
         x = x.view(-1, self.input_size)  # resiaze if needed, eg mnist
         prev_act = (x > 0).detach().float()
         idx_activation = 0

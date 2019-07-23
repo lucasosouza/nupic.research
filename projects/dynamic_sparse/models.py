@@ -694,9 +694,7 @@ class DSNNHeb(SparseModel):
 
             # early stop (alternative - keep a moving average)
             # ignore the last layer for now
-            mean_survival_ratio = np.mean(
-                survival_ratios[:-1]
-            )
+            mean_survival_ratio = np.mean(survival_ratios[:-1])
             if not np.isnan(mean_survival_ratio):
                 self.last_survival_ratios.append(mean_survival_ratio)
                 if self.debug_sparse:

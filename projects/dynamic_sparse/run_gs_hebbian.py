@@ -26,7 +26,7 @@ import ray.tune as tune
 import torch
 
 from loggers import DEFAULT_LOGGERS
-from utils import Trainable, download_dataset, new_experiment, run_experiment
+from utils import Trainable, new_experiment, run_experiment
 
 torch.manual_seed(32)
 
