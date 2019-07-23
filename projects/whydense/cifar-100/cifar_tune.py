@@ -34,7 +34,7 @@ from cifar_experiment import TinyCIFAR  # changed to local
 
 # added to test elastic search logger
 from nupic.research.support.elastic_logger import ElasticsearchLogger
-from ray.tune.logger import CSVLogger, JsonLogger, Logger
+from ray.tune.logger import DEFAULT_LOGGERS
 
 # Remove annoying messages saying training is taking too long
 logging.getLogger("ray.tune.util").setLevel(logging.ERROR)
@@ -152,7 +152,7 @@ def run_experiment(config, trainable):
             "cpu": config.get("cpu_percentage", 1.0),
             "gpu": config.get("gpu_percentage", 1.0),
         },
-        loggers=[CSVLogger, JsonLogger, Logger, ElasticsearchLogger]
+        loggers=[*DEFAULT_LOGGERS, ElasticsearchLogger]
         # # added parameters to allow monitoring through REST API
         # with_server=True,
         # server_port=4321,
