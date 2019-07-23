@@ -24,15 +24,12 @@ import os
 import ray
 import ray.tune as tune
 import torch
+torch.manual_seed(32)
 
 from loggers import DEFAULT_LOGGERS
 from utils import Trainable, download_dataset, new_experiment, run_experiment
 
-# basic config
-torch.manual_seed(32)
-ray.init()
-
-# alternative initialization based on configuration
+# experiment configurations
 base_exp_config = dict(
     device="cuda",
     # dataset related
@@ -76,6 +73,7 @@ base_exp_config = dict(
     debug_sparse=True,
 )
 
+# ray configurations
 tune_config = dict(
     name="hebbian-gs-test",
     num_samples=1,
@@ -88,7 +86,7 @@ tune_config = dict(
     verbose=1,
 )
 
-# get a config for each experiment
+# define experiments
 experiments = {
     'baselines': dict(
         model=tune.grid_search(["BaseModel", "SparseModel", "DSNN"]),
@@ -104,7 +102,8 @@ experiments = {
 }
 exp_configs = [(name, new_experiment(base_exp_config, c)) for name,c in experiments.items()]
 
-# Run all experiments in parallel
+# run all experiments in parallel
+ray.init()
 results = [run_experiment.remote(name, Trainable, c, tune_config) for name,c in exp_configs]
 ray.get(results)
 ray.shutdown()
