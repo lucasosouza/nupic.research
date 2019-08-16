@@ -72,6 +72,7 @@ class Dataset:
                 transforms.Normalize(self.stats_mean, self.stats_std),
             ]
         )
+        # set up augment transforms for training
         if not self.augment_images:
             aug_transform = transform
         else:
