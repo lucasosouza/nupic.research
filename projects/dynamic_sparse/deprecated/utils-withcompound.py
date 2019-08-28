@@ -23,75 +23,65 @@ import os
 
 import ray
 from ray import tune
-
-import torch # to remove later
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 import models
 import networks
-from datasets import PreprocessedSpeechDataLoader, VaryingDataLoader
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
 
-from torchsummary import summary
 
-class Dataset:
-    """Loads a dataset.
-    Returns object with a pytorch train and test loader
-    """
+
+class CompoundLoader():
+
+
+    def __init__(self):
+
+
+    def __iter__(self):
+
+
+
+class GSCDataset:
+    """A special type of dataset, customized for GSC"""
 
     def __init__(self, config=None):
 
         defaults = dict(
-            dataset_name=None,
             data_dir=None,
             batch_size_train=128,
             batch_size_test=128,
-            stats_mean=None,
-            stats_std=None,
-            augment_images=False,
-            test_noise=False,
-            noise_level=0.1,
+            batch_size_first_epoch=218,
         )
         defaults.update(config)
         self.__dict__.update(defaults)
-        self.data_dir = os.path.expanduser(self.data_dir)
 
-        if hasattr(datasets, self.dataset_name):
-            self.load_from_torch_vision()
-        elif 'PreprocessedGSC':
-            self.load_preprocessed_gsc()
-        else:
-            raise Exception("Dataset {}")
 
-    def load_preprocessed_gsc(self):
+        # test, regular
+        test_dataset = dataset_from_cached(self.data_dir / "gsc_valid.npz")
+        self.test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=self.batch_size_test)
 
-        self.train_loader = PreprocessedSpeechDataLoader(
-            self.data_dir,
-            subset="train",
-            batch_sizes=self.batch_size_train,
-            shuffle=True
-        )
+        self.train_loader = self.gen_train_loader()
+        self.epochs = 30
 
-        self.test_loader = PreprocessedSpeechDataLoader(
-            self.data_dir,
-            subset="valid",
-            silence_percentage=0,
-            batch_sizes=self.batch_size_test,
-        )
 
-        if self.test_noise:
-            self.noise_loader = PreprocessedSpeechDataLoader(
-                self.data_dir,
-                subset="test_noise",
-                silence_percentage=0,
-                batch_sizes=self.batch_size_test,
+    def gen_train_loader(self):
+
+        for epoch in self.epochs:
+            train_dataset = dataset_from_cached(DATAPATH / "gsc_train{}.npz".format(epoch))
+            train_loader = torch.utils.data.DataLoader(
+                train_dataset,
+                batch_size=(self.batch_size_first_epoch if epoch == 0
+                            else batch_size_test),
+                shuffle=True,
             )
-        else:
-            self.noise_loader = None
+            yield train_loader
 
-    def load_from_torch_vision(self):
-  
+        yield
+
+        for epoch in range(EPOCHS):
+
+
         # expand ~
         self.data_dir = os.path.expanduser(self.data_dir)
 
@@ -128,7 +118,7 @@ class Dataset:
         train_set = getattr(datasets, self.dataset_name)(
             root=self.data_dir, train=True, transform=aug_transform
         )
-        self.train_loader = loader_class(
+        self.train_loader = DataLoader(
             dataset=train_set, batch_size=self.batch_size_train, shuffle=True
         )
 
@@ -136,7 +126,88 @@ class Dataset:
         test_set = getattr(datasets, self.dataset_name)(
             root=self.data_dir, train=False, transform=transform
         )
-        self.test_loader = loader_class(
+        self.test_loader = DataLoader(
+            dataset=test_set, batch_size=self.batch_size_test, shuffle=False
+        )
+
+
+    def dataset_from_cached(filepath):
+        """
+        Get and cache a processed dataset from a folder of wav files.
+        :return: torch.utils.data.TensorDataset
+        """
+        x, y = np.load(filepath).values()
+        x, y = map(torch.tensor, (x, y))
+        return torch.utils.data.TensorDataset(x, y)
+
+
+class Dataset:
+    """Loads a dataset.
+
+    Returns object with a pytorch train and test loader
+    """
+
+    def __init__(self, config=None):
+
+        defaults = dict(
+            dataset_name=None,
+            data_dir=None,
+            batch_size_train=128,
+            batch_size_test=128,
+            stats_mean=None,
+            stats_std=None,
+            augment_images=False,
+            test_noise=False,
+            noise_level=0.1,
+        )
+        defaults.update(config)
+        self.__dict__.update(defaults)
+
+        # expand ~
+        self.data_dir = os.path.expanduser(self.data_dir)
+
+        # recover mean and std to normalize dataset
+        if not self.stats_mean or not self.stats_std:
+            tempset = getattr(datasets, self.dataset_name)(
+                root=self.data_dir, train=True, transform=transforms.ToTensor()
+            )
+            self.stats_mean = (tempset.data.float().mean().item() / 255,)
+            self.stats_std = (tempset.data.float().std().item() / 255,)
+            del tempset
+
+        # set up transformations
+        transform = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Normalize(self.stats_mean, self.stats_std),
+            ]
+        )
+        # set up augment transforms for training
+        if not self.augment_images:
+            aug_transform = transform
+        else:
+            aug_transform = transforms.Compose(
+                [
+                    transforms.RandomCrop(32, padding=4),
+                    transforms.RandomHorizontalFlip(),
+                    transforms.ToTensor(),
+                    transforms.Normalize(self.stats_mean, self.stats_std),
+                ]
+            )
+
+        # load train set
+        train_set = getattr(datasets, self.dataset_name)(
+            root=self.data_dir, train=True, transform=aug_transform
+        )
+        self.train_loader = DataLoader(
+            dataset=train_set, batch_size=self.batch_size_train, shuffle=True
+        )
+
+        # load test set
+        test_set = getattr(datasets, self.dataset_name)(
+            root=self.data_dir, train=False, transform=transform
+        )
+        self.test_loader = DataLoader(
             dataset=test_set, batch_size=self.batch_size_test, shuffle=False
         )
 
@@ -155,7 +226,7 @@ class Dataset:
             noise_set = getattr(datasets, self.dataset_name)(
                 root=self.data_dir, train=False, transform=noise_transform
             )
-            self.noise_loader = loader_class(
+            self.noise_loader = DataLoader(
                 dataset=noise_set, batch_size=self.batch_size_test, shuffle=False
             )
 
@@ -168,7 +239,6 @@ class Trainable(tune.Trainable):
 
     def _setup(self, config):
         network = getattr(networks, config["network"])(config=config)
-        # summary(network.to(torch.device('cpu')), input_size=(1, 32, 32))
         self.model = getattr(models, config["model"])(network, config=config)
         self.dataset = Dataset(config=config)
         self.model.setup()
@@ -216,126 +286,3 @@ def run_experiment(name, trainable, exp_config, tune_config):
     tune_config["name"] = name
     tune_config["config"] = exp_config
     tune.run(Trainable, **tune_config)
-
-
-def init_ray():
-    
-    ray.init()
-
-    def serializer(obj):
-        if obj.is_cuda:
-            return obj.cpu().numpy()
-        else:
-            return obj.numpy()
-
-
-    def deserializer(serialized_obj):
-        return serialized_obj
-
-    for t in [
-            torch.FloatTensor, torch.DoubleTensor, torch.HalfTensor,
-            torch.ByteTensor, torch.CharTensor, torch.ShortTensor,
-            torch.IntTensor, torch.LongTensor, torch.Tensor
-        ]:
-        ray.register_custom_serializer(
-            t, serializer=serializer, deserializer=deserializer)
-
-
-##### old Dataset
-
-# class Dataset:
-#     """Loads a dataset.
-
-#     Returns object with a pytorch train and test loader
-#     """
-
-#     def __init__(self, config=None):
-
-#         defaults = dict(
-#             dataset_name=None,
-#             data_dir=None,
-#             batch_size_train=128,
-#             batch_size_test=128,
-#             stats_mean=None,
-#             stats_std=None,
-#             augment_images=False,
-#             test_noise=False,
-#             noise_level=0.1,
-#             varying=True
-#         )
-#         defaults.update(config)
-#         self.__dict__.update(defaults)
-
-#         # added check for varying
-#         if self.varying:
-#             loader_class = DataLoader
-#         else:
-#             loader_class = VaryingDataLoader
-
-#         # expand ~
-#         self.data_dir = os.path.expanduser(self.data_dir)
-
-#         # recover mean and std to normalize dataset
-#         if not self.stats_mean or not self.stats_std:
-#             tempset = getattr(datasets, self.dataset_name)(
-#                 root=self.data_dir, train=True, transform=transforms.ToTensor()
-#             )
-#             self.stats_mean = (tempset.data.float().mean().item() / 255,)
-#             self.stats_std = (tempset.data.float().std().item() / 255,)
-#             del tempset
-
-#         # set up transformations
-#         transform = transforms.Compose(
-#             [
-#                 transforms.ToTensor(),
-#                 transforms.Normalize(self.stats_mean, self.stats_std),
-#             ]
-#         )
-#         # set up augment transforms for training
-#         if not self.augment_images:
-#             aug_transform = transform
-#         else:
-#             aug_transform = transforms.Compose(
-#                 [
-#                     transforms.RandomCrop(32, padding=4),
-#                     transforms.RandomHorizontalFlip(),
-#                     transforms.ToTensor(),
-#                     transforms.Normalize(self.stats_mean, self.stats_std),
-#                 ]
-#             )
-
-#         # load train set
-#         train_set = getattr(datasets, self.dataset_name)(
-#             root=self.data_dir, train=True, transform=aug_transform
-#         )
-#         self.train_loader = loader_class(
-#             dataset=train_set, batch_size=self.batch_size_train, shuffle=True
-#         )
-
-#         # load test set
-#         test_set = getattr(datasets, self.dataset_name)(
-#             root=self.data_dir, train=False, transform=transform
-#         )
-#         self.test_loader = loader_class(
-#             dataset=test_set, batch_size=self.batch_size_test, shuffle=False
-#         )
-
-#         # noise dataset
-#         if self.test_noise:
-#             noise = self.noise_level
-#             noise_transform = transforms.Compose(
-#                 [
-#                     transforms.ToTensor(),
-#                     transforms.Normalize(self.stats_mean, self.stats_std),
-#                     RandomNoise(
-#                         noise, high_value=0.5 + 2 * 0.20, low_value=0.5 - 2 * 0.2
-#                     ),
-#                 ]
-#             )
-#             noise_set = getattr(datasets, self.dataset_name)(
-#                 root=self.data_dir, train=False, transform=noise_transform
-#             )
-#             self.noise_loader = loader_class(
-#                 dataset=noise_set, batch_size=self.batch_size_test, shuffle=False
-#             )
-

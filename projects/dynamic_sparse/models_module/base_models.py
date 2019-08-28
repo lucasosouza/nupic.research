@@ -52,6 +52,7 @@ class BaseModel:
             boost_strength=1.4,
             boost_strength_factor=0.7,
             weight_decay=1e-4,
+            sparse_linear_only=False
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -77,9 +78,13 @@ class BaseModel:
             )
 
         # add a learning rate scheduler
-        if self.lr_scheduler:
+        if self.lr_scheduler == "MultiStepLR":
             self.lr_scheduler = schedulers.MultiStepLR(
                 self.optimizer, milestones=self.lr_milestones, gamma=self.lr_gamma
+            )
+        elif self.lr_scheduler == "StepLR":
+            self.lr_scheduler = optim.lr_scheduler.StepLR(
+                self.optimizer, step_size=1, gamma=self.lr_gamma
             )
 
         # init loss function
@@ -145,11 +150,10 @@ class BaseModel:
         if train and self.debug_weights:
             self._log_weights()
 
-    @staticmethod
-    def has_params(module):
+    def has_params(self, module):
         if isinstance(module, nn.Linear):
             return "linear"
-        elif isinstance(module, nn.Conv2d):
+        elif isinstance(module, nn.Conv2d) and not self.sparse_linear_only:
             return "conv"
 
     def _log_weights(self):
@@ -724,6 +728,9 @@ class DSNNMixedHeb(DSNNHeb):
         Prune by magnitude
         """
         with torch.no_grad():
+
+            # print("corr dimension", corr.shape)
+            # print("weight dimension", weight.shape)
 
             # transpose to fit the weights
             corr = corr.t()
