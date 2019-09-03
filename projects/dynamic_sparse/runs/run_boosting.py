@@ -19,14 +19,17 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+
 import os
 
 import ray
 import ray.tune as tune
 import torch
 
-from loggers import DEFAULT_LOGGERS
-from utils import Trainable, download_dataset
+import sys
+sys.path.append("../../")
+from dynamic_sparse.common.loggers import DEFAULT_LOGGERS
+from dynamic_sparse.common.utils import Trainable, download_dataset
 
 torch.manual_seed(32)  # run diversse samples
 
@@ -34,54 +37,48 @@ torch.manual_seed(32)  # run diversse samples
 exp_config = dict(
     # model related
     device="cuda",
-    network="MLPHeb",
+    # network=tune.grid_search(["vgg19_bn_kw", "vgg19_bn"]),
+    network="VGG19",
     num_classes=10,
-    model=tune.grid_search(["SET", "DSNNHeb", "DSNNFullHeb", "DSNNMixedHeb"]),
-    # model="BaseModel",
-    # model="DSNNMixedHeb",
+    model=tune.grid_search(["BaseModel", "SparseModel", "SET", "DSNN"]),
+    # model=tune.grid_search(["SET", "DSNN", "DSNN_Flip", "DSNN_Correct"]),
     dataset_name="CIFAR10",
-    input_size=3072,
+    augment_images=True,
     stats_mean=(0.4914, 0.4822, 0.4465),
     stats_std=(0.2023, 0.1994, 0.2010),
-    init_weights=True,
     data_dir="~/nta/datasets",
     # optimizer related
     optim_alg="SGD",
     momentum=0.9,
     learning_rate=0.01,
-    dropout=False,
-    weight_decay=1e-4,
-    # lr_scheduler="MultiStepLR",
-    # lr_milestones=[250, 290],
-    # lr_milestones=[250, 290],
-    # lr_gamma=0.10,
+    lr_scheduler="MultiStepLR",
+    lr_milestones=[250, 290],
+    lr_gamma=0.10,
+    debug_weights=True,
     # sparse related
     epsilon=100,
     start_sparse=1,
     end_sparse=None,
+    debug_sparse=True,
+    flip=False,
     weight_prune_perc=0.3,
+    grad_prune_perc=0,
     percent_on=0.3,
     boost_strength=1.4,
     boost_strength_factor=0.7,
-    kwinners=True,
-    pruning_early_stop=True,
-    pruning_early_stop_tolerance=5,
-    pruning_early_stop_threshold=0.02,
-    # test_noise=True,
-    # noise_level=0.1,
-    # debugging
-    debug_weights=True,
-    debug_sparse=True,
+    test_noise=True,
+    noise_level=0.1,
+    kwinners=tune.grid_search([True, False]),  # moved to a parameter
 )
 
 tune_config = dict(
-    name="hebbiandebug",
+    name="SET_DSNN_BoostingEval",
     num_samples=1,
     local_dir=os.path.expanduser("~/nta/results"),
     config=exp_config,
     checkpoint_freq=0,
     checkpoint_at_end=False,
-    stop={"training_iteration": 1000},  # 300 in cifar
+    stop={"training_iteration": 300},
     resources_per_trial={"cpu": 1, "gpu": 1},
     loggers=DEFAULT_LOGGERS,
     verbose=1,

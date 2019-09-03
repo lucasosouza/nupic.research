@@ -5,9 +5,6 @@ from torch import nn
 from torchvision import models
 from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
-import sys
-sys.path.append("..")
-
 class MLP(nn.Module):
     """Simple 3 hidden layers + output MLP"""
 

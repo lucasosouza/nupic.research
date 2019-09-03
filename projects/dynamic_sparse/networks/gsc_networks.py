@@ -5,9 +5,7 @@ from torch import nn
 from torchvision import models
 from nupic.torch.modules import Flatten, KWinners, KWinners2d
 
-import sys
-sys.path.append("..")
-from layers import calc_sparsity, DSConv2d, SparseConv2d, RandDSConv2d
+from .layers import calc_sparsity, DSConv2d, SparseConv2d, RandDSConv2d
 
 # redefine Flatten
 # class Lambda(nn.Module):

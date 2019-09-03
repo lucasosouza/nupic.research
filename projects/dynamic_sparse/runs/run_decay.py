@@ -25,8 +25,10 @@ import ray
 import ray.tune as tune
 import torch
 
-from loggers import DEFAULT_LOGGERS
-from utils import Trainable, download_dataset
+import sys
+sys.path.append("../../")
+from dynamic_sparse.common.loggers import DEFAULT_LOGGERS
+from dynamic_sparse.common.utils import Trainable, download_dataset
 
 torch.manual_seed(32)  # run diversse samples
 

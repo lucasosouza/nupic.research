@@ -25,64 +25,66 @@ import ray
 import ray.tune as tune
 import torch
 
-from loggers import DEFAULT_LOGGERS
-from utils import Trainable, download_dataset
+import sys
+sys.path.append("../../")
+from dynamic_sparse.common.loggers import DEFAULT_LOGGERS
+from dynamic_sparse.common.utils import Trainable, download_dataset
 
-# experiment configurations
+
+torch.manual_seed(32)  # run diverse samples
+
+# alternative initialization based on configuration
 exp_config = dict(
+    # model related
     device="cuda",
+    network="vgg19_bn",
+    num_classes=10,
+    model="DSNN",
+    # model=tune.grid_search(["SET", "DSNN", "DSNN_Flip", "DSNN_Correct"]),
     # dataset related
     dataset_name="CIFAR10",
-    input_size=(3,32,32),
-    num_classes=10,
+    augment_images=True,
     stats_mean=(0.4914, 0.4822, 0.4465),
     stats_std=(0.2023, 0.1994, 0.2010),
     data_dir="~/nta/datasets",
-    augment_images=tune.grid_search([True, False]),
-    # model related
-    model=tune.grid_search(["DynamicRep", "SparseModel", "BaseModel"]),
-    # model="SparseModel",
-    network="Wide_ResNet",
-    dropout_rate=0,
-    depth=28,
-    widen_factor=2,
     # optimizer related
     optim_alg="SGD",
     momentum=0.9,
-    learning_rate=0.1, 
-    weight_decay=5e-4,
+    learning_rate=0.01,
     lr_scheduler="MultiStepLR",
-    lr_milestones=[60,120,160], # 2e-2, 4e-3, 8-e4
-    lr_gamma=0.20,
-    # sparse related
-    on_perc=0.2,
-    zeta=0.2,
-    start_sparse=1,
-    end_sparse=None,
-    # debugging
+    lr_milestones=[250, 290],
+    lr_gamma=0.10,
     debug_weights=True,
+    # sparse related
+    epsilon=tune.grid_search([50, 100, 200]),
+    start_sparse=1,
+    # end_sparse=-1, # search later
     debug_sparse=True,
+    flip=False,  # search later, along with end sparse
+    weight_prune_perc=tune.grid_search([0, 0.1, 0.2, 0.3, 0.4]),
+    grad_prune_perc=tune.grid_search([0, 0.1, 0.2, 0.3, 0.4]),
 )
 
-# ray configurations
 tune_config = dict(
-    name="wideresnet-test",
+    name="SET_DSNN_GS1",
     num_samples=1,
     local_dir=os.path.expanduser("~/nta/results"),
+    config=exp_config,
     checkpoint_freq=0,
     checkpoint_at_end=False,
-    stop={"training_iteration": 200},  # 300 in cifar
+    stop={"training_iteration": 300},
     resources_per_trial={"cpu": 1, "gpu": 1},
     loggers=DEFAULT_LOGGERS,
     verbose=1,
-    config=exp_config
 )
+
+# TODO: automatically counts how many GPUs there are
 
 # override when running local for test
 if not torch.cuda.is_available():
     exp_config["device"] = "cpu"
     tune_config["resources_per_trial"] = {"cpu": 1}
 
-download_dataset(exp_config)
+# download_dataset(exp_config)
 ray.init()
 tune.run(Trainable, **tune_config)

@@ -28,9 +28,9 @@ import torch # to remove later
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-import models
-import networks
-from datasets import PreprocessedSpeechDataLoader, VaryingDataLoader
+import dynamic_sparse.models as models
+import dynamic_sparse.networks as networks
+from .datasets import PreprocessedSpeechDataLoader, VaryingDataLoader
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
 
 from torchsummary import summary
