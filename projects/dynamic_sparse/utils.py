@@ -128,7 +128,7 @@ class Dataset:
         train_set = getattr(datasets, self.dataset_name)(
             root=self.data_dir, train=True, transform=aug_transform
         )
-        self.train_loader = loader_class(
+        self.train_loader = DataLoader(
             dataset=train_set, batch_size=self.batch_size_train, shuffle=True
         )
 
@@ -136,7 +136,7 @@ class Dataset:
         test_set = getattr(datasets, self.dataset_name)(
             root=self.data_dir, train=False, transform=transform
         )
-        self.test_loader = loader_class(
+        self.test_loader = DataLoader(
             dataset=test_set, batch_size=self.batch_size_test, shuffle=False
         )
 
@@ -155,7 +155,7 @@ class Dataset:
             noise_set = getattr(datasets, self.dataset_name)(
                 root=self.data_dir, train=False, transform=noise_transform
             )
-            self.noise_loader = loader_class(
+            self.noise_loader = DataLoader(
                 dataset=noise_set, batch_size=self.batch_size_test, shuffle=False
             )
 
@@ -219,7 +219,7 @@ def run_experiment(name, trainable, exp_config, tune_config):
 
 
 def init_ray():
-    
+
     ray.init()
 
     def serializer(obj):
