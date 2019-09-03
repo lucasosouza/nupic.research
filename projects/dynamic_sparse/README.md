@@ -20,14 +20,8 @@ Networks are specific instances of neural networks. Can either be default, such 
 ### Utils
 
 Several support files, which can support one or more experiments.
-
-##### Dataset
-
-Datasets are loaders. As far as possible, should be agnostic to the dataset being loaded. The dataset name is a hyperparamenter defined in the run files. 
-
-##### Trainable
-
-Required to integrate with Ray Tune. Intermediate class between Ray Tune and Model, calls run_one_epoch at each iteration.
+- Dataset: Datasets are loaders. As far as possible, should be agnostic to the dataset being loaded. The dataset name is a hyperparamenter defined in the run files. 
+- Trainable: Required to integrate with Ray Tune. Intermediate class between Ray Tune and Model, calls run_one_epoch at each iteration.
 
 ### Runs
 
@@ -37,13 +31,13 @@ Each run file is a different experiment, conducted at some point. Stored to keep
 
 Tests, explorations, and analysis. Not part of the source code.
 
+### Tests
+
+Include all related tests implemented so far.  Broken down into:
+- Unit tests: Regular unit tests, to verify functionalities of models, networks, and common functions
+- Blackbox tests: Tests to evaluate if the output of a model and network are as expected. For example, a network with three 100-neurons hidden layers, trained on MNIST for 100 iterations with batch size 128, must return a validation accuracy above 90%. To allow for stochasticity, it is best if blackbox tests are averaged over multiple runs (3,5 or more, depending on the computational complexity).
+
 ### Deprecated
 
 Code no longer being used, but which might be stored temporarily during research period.
-
-
-More
-======
-
-For the full code base visit the fork @ github.com/lucasosouza.
 
