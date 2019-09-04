@@ -21,39 +21,34 @@
 
 import os
 
-import ray
-import ray.tune as tune
-
-import sys
-sys.path.append("../../")
-from dynamic_sparse.common.utils import Trainable
+from dynamic_sparse.common.utils import run_ray
 
 # alternative initialization based on configuration
-config = dict(
+exp_config = dict(
+    device="cuda",
     network="resnet18",
-    num_classes=10,
-    model="DSNN",
     dataset_name="CIFAR10",
+    input_size=(3, 32, 32),
+    num_classes=10,
     stats_mean=(0.4914, 0.4822, 0.4465),
     stats_std=(0.2023, 0.1994, 0.2010),
+    model="DSNN",
     data_dir="~/nta/datasets",
-    device="cpu",
-    optim_alg="SGD",
+    on_perc=0.2,
     batch_size_train=10,
     batch_size_test=10,
-    debug_sparse=False,
 )
 
 # run
-ray.init()
-tune.run(
-    Trainable,
-    name="SET_local_test",
+tune_config = dict(
+    name=__file__,
     num_samples=1,
     local_dir=os.path.expanduser("~/nta/results"),
-    config=config,
     checkpoint_freq=0,
     checkpoint_at_end=False,
     stop={"training_iteration": 10},
-    resources_per_trial={"cpu": 1, "gpu": 0},
+    resources_per_trial={"cpu": 1, "gpu": 1},
+    verbose=1,
 )
+
+run_ray(tune_config, exp_config)

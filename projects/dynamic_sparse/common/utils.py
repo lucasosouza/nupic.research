@@ -20,22 +20,21 @@
 # ----------------------------------------------------------------------
 
 import os
+from collections.abc import Iterable
 from copy import deepcopy
 
 import ray
+import torch  # to remove later
 from ray import tune
-
-import torch # to remove later
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 import dynamic_sparse.models as models
 import dynamic_sparse.networks as networks
-from .dataloaders import PreprocessedSpeechDataLoader, VaryingDataLoader
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
+from nupic.research.frameworks.pytorch.model_utils import set_random_seed
 
-from torchsummary import summary
-from collections.abc import Iterable
+from .dataloaders import PreprocessedSpeechDataLoader, VaryingDataLoader
 
 
 class Dataset:
@@ -62,7 +61,7 @@ class Dataset:
 
         if hasattr(datasets, self.dataset_name):
             self.load_from_torch_vision()
-        elif 'PreprocessedGSC':
+        elif self.dataset_name == "PreprocessedGSC":
             self.load_preprocessed_gsc()
         else:
             raise Exception("Dataset {}")
@@ -73,7 +72,7 @@ class Dataset:
             self.data_dir,
             subset="train",
             batch_sizes=self.batch_size_train,
-            shuffle=True
+            shuffle=True,
         )
 
         self.test_loader = PreprocessedSpeechDataLoader(
@@ -94,9 +93,11 @@ class Dataset:
             self.noise_loader = None
 
     def load_from_torch_vision(self):
-  
+
         # special dataloader case
-        if isinstance(self.batch_size_train, Iterable) or isinstance(self.batch_size_test, Iterable):
+        if isinstance(self.batch_size_train, Iterable) or isinstance(
+            self.batch_size_test, Iterable
+        ):
             dataloader_type = VaryingDataLoader
         else:
             dataloader_type = DataLoader
@@ -204,6 +205,7 @@ def download_dataset(config):
             download=True, root=os.path.expanduser(config["data_dir"])
         )
 
+
 def new_experiment(base_config, new_config):
     modified_config = deepcopy(base_config)
     modified_config.update(new_config)
@@ -237,17 +239,23 @@ def init_ray():
         else:
             return obj.numpy()
 
-
     def deserializer(serialized_obj):
         return serialized_obj
 
     for t in [
-            torch.FloatTensor, torch.DoubleTensor, torch.HalfTensor,
-            torch.ByteTensor, torch.CharTensor, torch.ShortTensor,
-            torch.IntTensor, torch.LongTensor, torch.Tensor
-        ]:
+        torch.FloatTensor,
+        torch.DoubleTensor,
+        torch.HalfTensor,
+        torch.ByteTensor,
+        torch.CharTensor,
+        torch.ShortTensor,
+        torch.IntTensor,
+        torch.LongTensor,
+        torch.Tensor,
+    ]:
         ray.register_custom_serializer(
-            t, serializer=serializer, deserializer=deserializer)
+            t, serializer=serializer, deserializer=deserializer
+        )
 
 
 def run_ray(tune_config, exp_config, fix_seed=False):
@@ -271,21 +279,26 @@ def run_ray(tune_config, exp_config, fix_seed=False):
         else:
             return obj.numpy()
 
-
     def deserializer(serialized_obj):
         return serialized_obj
 
     for t in [
-            torch.FloatTensor, torch.DoubleTensor, torch.HalfTensor,
-            torch.ByteTensor, torch.CharTensor, torch.ShortTensor,
-            torch.IntTensor, torch.LongTensor, torch.Tensor
-        ]:
+        torch.FloatTensor,
+        torch.DoubleTensor,
+        torch.HalfTensor,
+        torch.ByteTensor,
+        torch.CharTensor,
+        torch.ShortTensor,
+        torch.IntTensor,
+        torch.LongTensor,
+        torch.Tensor,
+    ]:
         ray.register_custom_serializer(
-            t, serializer=serializer, deserializer=deserializer)
+            t, serializer=serializer, deserializer=deserializer
+        )
 
     # fix seed
     if fix_seed:
-        torch.manual_seed(32)
-
+        set_random_seed(32)
 
     tune.run(Trainable, **tune_config)

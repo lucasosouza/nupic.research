@@ -19,17 +19,16 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from collections import deque
 from collections.abc import Iterable
-from collections import defaultdict, deque
 
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.optim.lr_scheduler as schedulers
-from .main import *
 
-from dynamic_sparse.networks.layers import calc_sparsity, DSConv2d, SparseConv2d
+from dynamic_sparse.networks.layers import DSConv2d, SparseConv2d, calc_sparsity
+
+from .main import BaseModel, SparseModel
+
 
 class DSNNHeb(SparseModel):
     """Improved results compared to regular SET"""
@@ -48,7 +47,7 @@ class DSNNHeb(SparseModel):
             pruning_es_threshold=0.02,
             pruning_interval=1,
             hebbian_prune_perc=0,
-            hebbian_grow=True
+            hebbian_grow=True,
         )
         new_defaults = {k: v for k, v in new_defaults.items() if k not in self.__dict__}
         self.__dict__.update(new_defaults)
@@ -74,7 +73,9 @@ class DSNNHeb(SparseModel):
             # keep track of added synapes
             survival_ratios = []
 
-            for idx, (m, corr) in enumerate(zip(self.sparse_modules, self.network.correlations)):
+            for idx, (m, corr) in enumerate(
+                zip(self.sparse_modules, self.network.correlations)
+            ):
                 new_mask, keep_mask, new_synapses = self.prune(
                     m.weight.clone().detach(), self.num_params[idx], corr, idx=idx
                 )
@@ -207,7 +208,9 @@ class DSNNMixedHeb(DSNNHeb):
 
             # no gradient mask, just a keep mask
             keep_mask = weight_keep_mask & hebbian_keep_mask
-            self.log["weight_keep_mask_l" + str(idx)] = torch.sum(keep_mask).item() / shape
+            self.log["weight_keep_mask_l" + str(idx)] = (
+                torch.sum(keep_mask).item() / shape
+            )
 
             # calculate number of parameters to add
             num_add = max(
@@ -215,7 +218,7 @@ class DSNNMixedHeb(DSNNHeb):
             )  # TODO: debug why < 0
             self.log["missing_weights_l" + str(idx)] = num_add / shape
 
-            # added option to have hebbian grow or not 
+            # added option to have hebbian grow or not
             if self.hebbian_grow:
                 # remove the ones which will already be kept
                 corr *= (keep_mask == 0).float()
@@ -236,6 +239,7 @@ class DSNNMixedHeb(DSNNHeb):
         # track added connections
         return new_mask, keep_mask, add_mask
 
+
 class DSNNConvHeb(DSNNMixedHeb):
     """
     Similar to other sparse models, but the focus here is on convolutional layers as
@@ -243,12 +247,12 @@ class DSNNConvHeb(DSNNMixedHeb):
     """
 
     log_attrs = [
-        'pruning_iterations',
-        'kept_frac',
-        'prune_mask_sparsity',
-        'keep_mask_sparsity',
-        'weight_sparsity',
-        'last_coactivations',
+        "pruning_iterations",
+        "kept_frac",
+        "prune_mask_sparsity",
+        "keep_mask_sparsity",
+        "weight_sparsity",
+        "last_coactivations",
     ]
 
     def is_sparse(self, module):
@@ -265,10 +269,11 @@ class DSNNConvHeb(DSNNMixedHeb):
         # print(self.sparse_conv_modules)
 
     def _post_epoch_updates(self, dataset=None):
-        """Only change in the model is here. 
+        """
+        Only change in the model is here.
         In order to work, need to use networks which have DSConv2d layer
-        which network is being used?"""
-
+        which network is being used?
+        """
         print("calling post epoch")
         super()._post_epoch_updates(dataset)
 
@@ -279,18 +284,18 @@ class DSNNConvHeb(DSNNMixedHeb):
             # print(isinstance(module, DSConv2d))
             # print("progressing connections")
             # Log coactivation before pruning - otherwise they get reset.
-            self.log['hist_' + 'coactivations_' + str(idx)] = module.coactivations
+            self.log["hist_" + "coactivations_" + str(idx)] = module.coactivations
             # Prune. Then log some params.
             module.progress_connections()
             print("progressing")
             for attr in self.log_attrs:
                 value = getattr(module, attr) if hasattr(module, attr) else -2
                 if isinstance(value, Iterable):
-                    attr = 'hist_' + attr
-                self.log[attr + '_' + str(idx)] = value
+                    attr = "hist_" + attr
+                self.log[attr + "_" + str(idx)] = value
 
             if isinstance(module, (DSConv2d, SparseConv2d)):
-                self.log['sparsity_' + str(idx)] = calc_sparsity(module.weight)
+                self.log["sparsity_" + str(idx)] = calc_sparsity(module.weight)
 
 
 class DSNNConvOnlyHeb(BaseModel):
@@ -300,12 +305,12 @@ class DSNNConvOnlyHeb(BaseModel):
     """
 
     log_attrs = [
-        'pruning_iterations',
-        'kept_frac',
-        'prune_mask_sparsity',
-        'keep_mask_sparsity',
-        'weight_sparsity',
-        'last_coactivations',
+        "pruning_iterations",
+        "kept_frac",
+        "prune_mask_sparsity",
+        "keep_mask_sparsity",
+        "weight_sparsity",
+        "last_coactivations",
     ]
 
     def is_sparse(self, module):
@@ -322,10 +327,11 @@ class DSNNConvOnlyHeb(BaseModel):
         # print(self.sparse_conv_modules)
 
     def _post_epoch_updates(self, dataset=None):
-        """Only change in the model is here. 
+        """
+        Only change in the model is here.
         In order to work, need to use networks which have DSConv2d layer
-        which network is being used?"""
-
+        which network is being used?
+        """
         print("calling post epoch")
         super()._post_epoch_updates(dataset)
 
@@ -336,16 +342,15 @@ class DSNNConvOnlyHeb(BaseModel):
             # print(isinstance(module, DSConv2d))
             # print("progressing connections")
             # Log coactivation before pruning - otherwise they get reset.
-            self.log['hist_' + 'coactivations_' + str(idx)] = module.coactivations
+            self.log["hist_" + "coactivations_" + str(idx)] = module.coactivations
             # Prune. Then log some params.
             module.progress_connections()
             print("progressing")
             for attr in self.log_attrs:
                 value = getattr(module, attr) if hasattr(module, attr) else -2
                 if isinstance(value, Iterable):
-                    attr = 'hist_' + attr
-                self.log[attr + '_' + str(idx)] = value
+                    attr = "hist_" + attr
+                self.log[attr + "_" + str(idx)] = value
 
             if isinstance(module, (DSConv2d, SparseConv2d)):
-                self.log['sparsity_' + str(idx)] = calc_sparsity(module.weight)
-
+                self.log["sparsity_" + str(idx)] = calc_sparsity(module.weight)

@@ -25,18 +25,15 @@ import ray
 import ray.tune as tune
 import torch
 
-import sys
-sys.path.append("../../")
 from dynamic_sparse.common.loggers import DEFAULT_LOGGERS
 from dynamic_sparse.common.utils import Trainable, download_dataset
-
 
 # experiment configurations
 exp_config = dict(
     device="cuda",
     # dataset related
     dataset_name="CIFAR10",
-    input_size=(3,32,32),
+    input_size=(3, 32, 32),
     num_classes=10,
     stats_mean=(0.4914, 0.4822, 0.4465),
     stats_std=(0.2023, 0.1994, 0.2010),
@@ -52,10 +49,10 @@ exp_config = dict(
     # optimizer related
     optim_alg="SGD",
     momentum=0.9,
-    learning_rate=0.1, 
+    learning_rate=0.1,
     weight_decay=5e-4,
     lr_scheduler="MultiStepLR",
-    lr_milestones=[60,120,160], # 2e-2, 4e-3, 8-e4
+    lr_milestones=[60, 120, 160],  # 2e-2, 4e-3, 8-e4
     lr_gamma=0.20,
     # sparse related
     on_perc=0.2,
@@ -78,7 +75,7 @@ tune_config = dict(
     resources_per_trial={"cpu": 1, "gpu": 1},
     loggers=DEFAULT_LOGGERS,
     verbose=1,
-    config=exp_config
+    config=exp_config,
 )
 
 # override when running local for test

@@ -19,10 +19,10 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import sys
 import os
 
 from ray import tune
+
 from dynamic_sparse.common.loggers import DEFAULT_LOGGERS
 from dynamic_sparse.common.utils import run_ray
 
@@ -33,23 +33,23 @@ base_exp_config = dict(
     dataset_name="MNIST",
     input_size=784,
     num_classes=10,
-    hidden_sizes = [100,100,100],
+    hidden_sizes=[100, 100, 100],
     data_dir=os.path.expanduser("~/nta/datasets"),
     # model related
     model="DSNNMixedHeb",
     network="MLPHeb",
-    kwinners=tune.grid_search([True,False]), # 2
+    kwinners=tune.grid_search([True, False]),  # 2
     percent_on=0.3,
-    on_perc=tune.grid_search([0.05, 0.1, 0.2]), # 3
+    on_perc=tune.grid_search([0.05, 0.1, 0.2]),  # 3
     # sparse related
-    hebbian_prune_perc=tune.grid_search([0,0.1,0.2,0.3,0.4,0.5]), # 6
-    weight_prune_perc=tune.grid_search([0,0.1,0.2,0.3,0.4,0.5]), # 6
+    hebbian_prune_perc=tune.grid_search([0, 0.1, 0.2, 0.3, 0.4, 0.5]),  # 6
+    weight_prune_perc=tune.grid_search([0, 0.1, 0.2, 0.3, 0.4, 0.5]),  # 6
     pruning_es=False,
     pruning_active=True,
-    hebbian_grow=tune.grid_search([True, False]), # 2
+    hebbian_grow=tune.grid_search([True, False]),  # 2
     # additional validation
     test_noise=True,
-    noise_level=0.15, # test with more agressive noise
+    noise_level=0.15,  # test with more agressive noise
     # debugging
     debug_weights=True,
     debug_sparse=True,
@@ -57,7 +57,7 @@ base_exp_config = dict(
 
 # ray configurations
 tune_config = dict(
-    name=__file__ + '_eval2',
+    name=__file__ + "_eval2",
     num_samples=1,
     local_dir=os.path.expanduser("~/nta/results"),
     checkpoint_freq=0,

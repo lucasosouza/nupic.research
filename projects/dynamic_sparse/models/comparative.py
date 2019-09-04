@@ -19,7 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from collections import defaultdict, deque
+from collections import defaultdict
 
 import numpy as np
 import torch
@@ -173,6 +173,7 @@ class BaseModel:
     def restore(self):
         pass
 
+
 class SparseModel(BaseModel):
     """Sparsity implemented by:
     - Masking on the weights. UPDATE: Not based on epsilon, but fixed on_perc
@@ -199,7 +200,7 @@ class SparseModel(BaseModel):
 
             # initialize masks
             for m in self.sparse_modules:
-                shape = m.weight.shape                
+                shape = m.weight.shape
                 mask = (torch.rand(shape) < self.on_perc).float().to(self.device)
                 m.weight.data *= mask
                 self.masks.append(mask)
@@ -282,12 +283,12 @@ class DynamicRep(SparseModel):
         # count params
         self._initialize_prune_threshold()
         self._count_params()
-        
+
         # debugging start
         toprune_params = int(self.available_params * (self.zeta))
         toprune_baseline = (
-            int(toprune_params * (1-self.h_tolerance)),
-            int(toprune_params * (1+self.h_tolerance)),
+            int(toprune_params * (1 - self.h_tolerance)),
+            int(toprune_params * (1 + self.h_tolerance)),
         )
         print(toprune_params)
         print(toprune_baseline)
@@ -295,10 +296,11 @@ class DynamicRep(SparseModel):
         # initialize data structure keep track of added synapses
         self.added_synapses = [None for m in self.masks]
 
-
     def _count_params(self):
-        """Count parameters of the network (sparse modules alone)
-        No need to keep track of full parameters, just the available ones"""
+        """
+        Count parameters of the network (sparse modules alone)
+        No need to keep track of full parameters, just the available ones
+        """
         self.available_params = 0
         for m in list(self.network.modules())[self.start_sparse : self.end_sparse]:
             if self.has_params(m):
@@ -315,8 +317,8 @@ class DynamicRep(SparseModel):
                     # count how many weights are not equal to 0
                     count_p = torch.sum(m.weight != 0).item()
                     # get topk for that level, and weight by num of values
-                    non_zero = torch.abs(m.weight[m.weight!=0]).view(-1)                
-                    val, _ = torch.kthvalue(non_zero, int(len(non_zero)*self.on_perc))
+                    non_zero = torch.abs(m.weight[m.weight != 0]).view(-1)
+                    val, _ = torch.kthvalue(non_zero, int(len(non_zero) * self.on_perc))
                     weighted_mean += count_p * val.item()
                     total_params_count += count_p
 
@@ -343,49 +345,46 @@ class DynamicRep(SparseModel):
             self.grown_count = 0
             for idx, m in enumerate(self.sparse_modules):
                 # calculate number of weights to add
-                available = torch.sum(m.weight!=0).item()
+                available = torch.sum(m.weight != 0).item()
                 num_add = int(available / total_available * toprune_count)
                 # prune weights
                 new_mask, keep_mask, grow_mask = self.prune_and_grow(
-                    m.weight.clone().detach(), num_add)
+                    m.weight.clone().detach(), num_add
+                )
                 self.masks[idx] = new_mask.float()
                 m.weight.data *= self.masks[idx].float()
 
-                ### DEBUGGING STUFF. TODO: move code to some other place
+                # DEBUGGING STUFF. TODO: move code to some other place
 
                 # count how many synapses from last round have survived
                 if self.added_synapses[idx] is not None:
                     total_added = torch.sum(self.added_synapses[idx]).item()
-                    surviving = torch.sum(
-                        self.added_synapses[idx] & keep_mask
-                    ).item()
+                    surviving = torch.sum(self.added_synapses[idx] & keep_mask).item()
                     if total_added:
                         survival_ratio = surviving / total_added
                         # log if in debug sparse mode
                         if self.debug_sparse:
-                            self.log[
-                                "surviving_synapses_l" + str(idx)
-                            ] = survival_ratio
+                            self.log["surviving_synapses_l" + str(idx)] = survival_ratio
 
                 # keep track of new synapses to count surviving on next round
                 self.added_synapses[idx] = grow_mask
 
         # track main parameters
-        self.log['dyre_total_available'] = total_available
-        self.log['dyre_delta_available'] = self.available_params - total_available        
-        self.log['dyre_to_prune'] = toprune_count
-        self.log['dyre_pruned_count'] = self.pruned_count        
-        self.log['dyre_grown_count'] = self.grown_count        
-        self.log['dyre_h_threshold'] = self.h
+        self.log["dyre_total_available"] = total_available
+        self.log["dyre_delta_available"] = self.available_params - total_available
+        self.log["dyre_to_prune"] = toprune_count
+        self.log["dyre_pruned_count"] = self.pruned_count
+        self.log["dyre_grown_count"] = self.grown_count
+        self.log["dyre_h_threshold"] = self.h
         # update H according to the simple rule
         # if actual pruned less than threshold, reduce tolerance
-        if self.pruned_count < int(toprune_count * (1-self.h_tolerance)):
+        if self.pruned_count < int(toprune_count * (1 - self.h_tolerance)):
             self.h *= 2
-            self.log['dyre_h_delta'] = 1
+            self.log["dyre_h_delta"] = 1
         # if greater, increase tolerance
-        elif self.pruned_count > int(toprune_count * (1+self.h_tolerance)):
+        elif self.pruned_count > int(toprune_count * (1 + self.h_tolerance)):
             self.h /= 2
-            self.log['dyre_h_delta'] = -1
+            self.log["dyre_h_delta"] = -1
 
         # keep track of mask sizes when debugging
         if self.debug_sparse:
@@ -396,13 +395,13 @@ class DynamicRep(SparseModel):
         """Steps
         1- Sample positions to grow new weights (sample indexes)
         2- Update parameter count
-        3- Prune parameters based on H - update prune mask 
+        3- Prune parameters based on H - update prune mask
         4- Grow randomly sampled parameters - update add mask
         5 - return both masks
         """
         with torch.no_grad():
 
-            ## GROW
+            # GROW
             # identify non-zero entries
             nonzero_idxs = torch.nonzero(weight)
             num_available_params = len(nonzero_idxs)
@@ -414,7 +413,7 @@ class DynamicRep(SparseModel):
             grow_mask[tuple(togrow_idxs.T)] = 1
             num_grow = len(togrow_idxs)
 
-            ## PRUNE
+            # PRUNE
 
             keep_mask = (torch.abs(weight) > self.h).to(self.device)
             num_prune = num_available_params - torch.sum(keep_mask).item()
@@ -429,8 +428,4 @@ class DynamicRep(SparseModel):
             self.available_params -= num_prune
 
         # track added connections
-        return new_mask, keep_mask, grow_mask            
-
-
-
-
+        return new_mask, keep_mask, grow_mask

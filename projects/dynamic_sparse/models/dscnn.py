@@ -19,16 +19,13 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from collections import defaultdict, deque
+from collections import defaultdict
 from collections.abc import Iterable
 
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.optim.lr_scheduler as schedulers
+from dynamic_sparse.networks.layers import DSConv2d, SparseConv2d, calc_sparsity
 
-from layers import DSConv2d, SparseConv2d, calc_sparsity
+from .main import BaseModel
+
 
 class DSCNN(BaseModel):
     """

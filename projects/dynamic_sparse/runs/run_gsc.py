@@ -1,4 +1,3 @@
-
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
 # Copyright (C) 2019, Numenta, Inc.  Unless you have an agreement
@@ -22,16 +21,11 @@
 
 import os
 
-import ray
 import ray.tune as tune
 import torch
 
-import sys
-sys.path.append("../../")
 from dynamic_sparse.common.loggers import DEFAULT_LOGGERS
-from dynamic_sparse.common.utils import Trainable, download_dataset, new_experiment, run_experiment,init_ray
-
-
+from dynamic_sparse.common.utils import Trainable, init_ray
 
 torch.manual_seed(32)
 
@@ -43,16 +37,15 @@ base_exp_config = dict(
     data_dir="~/nta/datasets/gsc",
     batch_size_train=(4, 16),
     batch_size_test=1000,
-
     # ----- Network Related ------
     # SE
-    # model=tune.grid_search(["BaseModel", "SparseModel", "DSNNMixedHeb", "DSNNConvHeb"]),
+    # model=tune.grid_search(["BaseModel", "SparseModel",
+    # "DSNNMixedHeb", "DSNNConvHeb"]),
     model="DSNNConvOnlyHeb",
     # model="DSNNConvHeb",
     # network="GSCHeb",
     network="gsc_conv_heb",
     # network="gsc_conv_only_heb",
-
     # ----- Optimizer Related ----
     optim_alg="SGD",
     momentum=0,
@@ -60,14 +53,13 @@ base_exp_config = dict(
     weight_decay=0.01,
     lr_scheduler="StepLR",
     lr_gamma=0.90,
-    use_kwinners = True,
+    use_kwinners=True,
     # use_kwinners=tune.grid_search([True, False]),
-
     # ----- Dynamic-Sparse Related  - FC LAYER -----
-    epsilon=184.61538/3, # 0.1 in the 1600-1000 linear layer
-    sparse_linear_only = True,
+    epsilon=184.61538 / 3,  # 0.1 in the 1600-1000 linear layer
+    sparse_linear_only=True,
     start_sparse=1,
-    end_sparse=-1, # don't get last layer
+    end_sparse=-1,  # don't get last layer
     weight_prune_perc=0.15,
     hebbian_prune_perc=0.60,
     pruning_es=True,
@@ -75,19 +67,16 @@ base_exp_config = dict(
     pruning_es_window_size=5,
     pruning_es_threshold=0.02,
     pruning_interval=1,
-
     # ----- Dynamic-Sparse Related  - CONV -----
-    prune_methods=tune.grid_search([None, 'random', 'dynamic', 'static']),
+    prune_methods=tune.grid_search([None, "random", "dynamic", "static"]),
     hebbian_prune_frac=[1.0, 1.0],
     magnitude_prune_frac=[0.0, 0.0],
     sparsity=[0.90, 0.90],
     update_nsteps=[3000, 3000],
     prune_dims=tuple(),
-
     # ----- Additional Validation -----
     test_noise=False,
     noise_level=0.1,
-
     # ----- Debugging -----
     debug_weights=True,
     debug_sparse=True,
@@ -102,7 +91,7 @@ tune_config = dict(
     checkpoint_freq=0,
     checkpoint_at_end=False,
     stop={"training_iteration": 100},
-    resources_per_trial={"cpu": 1,"gpu": 1},
+    resources_per_trial={"cpu": 1, "gpu": 1},
     loggers=DEFAULT_LOGGERS,
     verbose=1,
     config=base_exp_config,

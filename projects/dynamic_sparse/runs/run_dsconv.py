@@ -46,7 +46,6 @@ def deserializer(serialized_obj):
 # experiment configurations
 base_exp_config = dict(
     device=("cuda" if torch.cuda.device_count() > 0 else "cpu"),
-
     # ----- Dataset Related -----
     # dataset_name="CIFAR10",
     # input_size=(3, 32, 32),
@@ -61,7 +60,6 @@ base_exp_config = dict(
     data_dir="~/nta/datasets/gsc",
     batch_size_train=(4, 16),
     batch_size_test=(1000),
-
     # ----- Network Related ------
     # > DSCNN
     # model="DSCNN",
@@ -76,7 +74,6 @@ base_exp_config = dict(
     # percent_on=0.3,
     # boost_strength=1.4,
     # boost_strength_factor=0.7,
-
     # ----- Optimizer Related ----
     # optim_alg="SGD",
     # momentum=0.9,
@@ -87,20 +84,16 @@ base_exp_config = dict(
     momentum=0.0,
     learning_rate=0.01,
     weight_decay=1e-2,
-
     # ----- LR Scheduler Related ----
     lr_scheduler="StepLR",
     lr_step_size=1,
     lr_gamma=0.9,
-
     # ----- Dynamic-Sparse Related -----
     # * See DSCNN network for allowable params
     # * Params set below in experiments.
-
     # ----- Additional Validation -----
     test_noise=False,
     noise_level=0.1,
-
     # ----- Vebugging -----
     debug_weights=True,
     debug_sparse=True,
@@ -166,9 +159,11 @@ experiments = {
     #     sparsity=tune.grid_search([0.98, 0.99, 0.999]),
     # ),
 }
-exp_configs = [
-    (name, new_experiment(base_exp_config, c)) for name, c in experiments.items()
-] if experiments else [(experiment_name, base_exp_config)]
+exp_configs = (
+    [(name, new_experiment(base_exp_config, c)) for name, c in experiments.items()]
+    if experiments
+    else [(experiment_name, base_exp_config)]
+)
 
 # Download dataset.
 download_dataset(base_exp_config)
@@ -176,12 +171,17 @@ download_dataset(base_exp_config)
 # Register serializers.
 ray.init()
 for t in [
-    torch.FloatTensor, torch.DoubleTensor, torch.HalfTensor,
-    torch.ByteTensor, torch.CharTensor, torch.ShortTensor,
-    torch.IntTensor, torch.LongTensor, torch.Tensor
+    torch.FloatTensor,
+    torch.DoubleTensor,
+    torch.HalfTensor,
+    torch.ByteTensor,
+    torch.CharTensor,
+    torch.ShortTensor,
+    torch.IntTensor,
+    torch.LongTensor,
+    torch.Tensor,
 ]:
-    ray.register_custom_serializer(
-        t, serializer=serializer, deserializer=deserializer)
+    ray.register_custom_serializer(t, serializer=serializer, deserializer=deserializer)
 
 # run all experiments in parallel
 results = [

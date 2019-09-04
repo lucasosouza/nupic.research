@@ -48,16 +48,16 @@ def download_tarball():
     total_size = int(r.headers.get("content-length", 0))
     block_size = 1024
     wrote = 0
-    with tqdm(total=total_size, unit="B", unit_scale=True, leave=False,
-              desc="Downloading") as pbar:
+    with tqdm(
+        total=total_size, unit="B", unit_scale=True, leave=False, desc="Downloading"
+    ) as pbar:
         with open(tmppath, "wb") as f:
             for data in r.iter_content(block_size):
                 wrote = wrote + len(data)
                 f.write(data)
                 pbar.update(len(data))
     if total_size != 0 and wrote != total_size:
-        raise requests.exceptions.ConnectionError(
-            "Connection to {} failed".format(URL))
+        raise requests.exceptions.ConnectionError("Connection to {} failed".format(URL))
     else:
         shutil.move(tmppath, TARFILEPATH)
 
@@ -67,9 +67,17 @@ def extract_tarball():
     with tarfile.open(TARFILEPATH) as tar:
         # This is slow to count.
         tot = 42  # len(list(tar.getnames()))
-        tar.extractall(DATAPATH,
-                       members=tqdm(tar, desc="Extracting", total=tot,
-                                    unit="file", unit_scale=True, leave=False))
+        tar.extractall(
+            DATAPATH,
+            members=tqdm(
+                tar,
+                desc="Extracting",
+                total=tot,
+                unit="file",
+                unit_scale=True,
+                leave=False,
+            ),
+        )
 
 
 if __name__ == "__main__":

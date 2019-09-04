@@ -19,7 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from collections import defaultdict, deque
+from collections import defaultdict
 
 import numpy as np
 import torch
@@ -54,7 +54,7 @@ class BaseModel:
             boost_strength_factor=0.7,
             weight_decay=1e-4,
             sparse_linear_only=False,
-            epsilon=None
+            epsilon=None,
         )
         defaults.update(config or {})
         self.__dict__.update(defaults)
@@ -189,16 +189,23 @@ class BaseModel:
             log = self.run_epoch(dataset, epoch, test_noise)
             # print intermediate results
             if test_noise:
-                print("Train acc: {:.4f}, Val acc: {:.4f}, Noise acc: {:.4f}".format(
-                    log['train_acc'], log['val_acc'], log['noise_acc']))
+                print(
+                    "Train acc: {:.4f}, Val acc: {:.4f}, Noise acc: {:.4f}".format(
+                        log["train_acc"], log["val_acc"], log["noise_acc"]
+                    )
+                )
             else:
-                print("Train acc: {:.4f}, Val acc: {:.4f}".format(
-                    log['train_acc'], log['val_acc']))
+                print(
+                    "Train acc: {:.4f}, Val acc: {:.4f}".format(
+                        log["train_acc"], log["val_acc"]
+                    )
+                )
             # add log to results
             for var in log:
                 results[var].append(log[var])
 
         return results
+
 
 class SparseModel(BaseModel):
     """Sparsity implemented by:
@@ -246,7 +253,7 @@ class SparseModel(BaseModel):
             # setup for training
             inputs = inputs.to(self.device)
             targets = targets.to(self.device)
-            self.optimizer.zero_grad() # zero out gradients
+            self.optimizer.zero_grad()  # zero out gradients
 
             # forward + backward + optimize
             with torch.set_grad_enabled(train):
@@ -537,6 +544,3 @@ class DSNN(SparseModel):
         if self.debug_sparse:
             for idx, m in enumerate(self.masks):
                 self.log["mask_sizes_l" + str(idx)] = torch.sum(m).item()
-
-
-
