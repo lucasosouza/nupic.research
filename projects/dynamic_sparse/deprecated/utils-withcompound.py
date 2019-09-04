@@ -286,3 +286,106 @@ def run_experiment(name, trainable, exp_config, tune_config):
     tune_config["name"] = name
     tune_config["config"] = exp_config
     tune.run(Trainable, **tune_config)
+
+
+    
+
+##### old Dataset
+
+# class Dataset:
+#     """Loads a dataset.
+
+#     Returns object with a pytorch train and test loader
+#     """
+
+#     def __init__(self, config=None):
+
+#         defaults = dict(
+#             dataset_name=None,
+#             data_dir=None,
+#             batch_size_train=128,
+#             batch_size_test=128,
+#             stats_mean=None,
+#             stats_std=None,
+#             augment_images=False,
+#             test_noise=False,
+#             noise_level=0.1,
+#             varying=True
+#         )
+#         defaults.update(config)
+#         self.__dict__.update(defaults)
+
+#         # added check for varying
+#         if self.varying:
+#             loader_class = DataLoader
+#         else:
+#             loader_class = VaryingDataLoader
+
+#         # expand ~
+#         self.data_dir = os.path.expanduser(self.data_dir)
+
+#         # recover mean and std to normalize dataset
+#         if not self.stats_mean or not self.stats_std:
+#             tempset = getattr(datasets, self.dataset_name)(
+#                 root=self.data_dir, train=True, transform=transforms.ToTensor()
+#             )
+#             self.stats_mean = (tempset.data.float().mean().item() / 255,)
+#             self.stats_std = (tempset.data.float().std().item() / 255,)
+#             del tempset
+
+#         # set up transformations
+#         transform = transforms.Compose(
+#             [
+#                 transforms.ToTensor(),
+#                 transforms.Normalize(self.stats_mean, self.stats_std),
+#             ]
+#         )
+#         # set up augment transforms for training
+#         if not self.augment_images:
+#             aug_transform = transform
+#         else:
+#             aug_transform = transforms.Compose(
+#                 [
+#                     transforms.RandomCrop(32, padding=4),
+#                     transforms.RandomHorizontalFlip(),
+#                     transforms.ToTensor(),
+#                     transforms.Normalize(self.stats_mean, self.stats_std),
+#                 ]
+#             )
+
+#         # load train set
+#         train_set = getattr(datasets, self.dataset_name)(
+#             root=self.data_dir, train=True, transform=aug_transform
+#         )
+#         self.train_loader = loader_class(
+#             dataset=train_set, batch_size=self.batch_size_train, shuffle=True
+#         )
+
+#         # load test set
+#         test_set = getattr(datasets, self.dataset_name)(
+#             root=self.data_dir, train=False, transform=transform
+#         )
+#         self.test_loader = loader_class(
+#             dataset=test_set, batch_size=self.batch_size_test, shuffle=False
+#         )
+
+#         # noise dataset
+#         if self.test_noise:
+#             noise = self.noise_level
+#             noise_transform = transforms.Compose(
+#                 [
+#                     transforms.ToTensor(),
+#                     transforms.Normalize(self.stats_mean, self.stats_std),
+#                     RandomNoise(
+#                         noise, high_value=0.5 + 2 * 0.20, low_value=0.5 - 2 * 0.2
+#                     ),
+#                 ]
+#             )
+#             noise_set = getattr(datasets, self.dataset_name)(
+#                 root=self.data_dir, train=False, transform=noise_transform
+#             )
+#             self.noise_loader = loader_class(
+#                 dataset=noise_set, batch_size=self.batch_size_test, shuffle=False
+#             )
+
+

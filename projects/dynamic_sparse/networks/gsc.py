@@ -254,9 +254,9 @@ def make_dscnn(net, config={}):
                 prune_method = prune_methods[idx]
                 if prune_method in ['static', 'random', 'dynamic']:
                     kwargs = kwargs_s[idx]            
-                    NewConv = get_conv_type(prune_method)
+                    conv_type = get_conv_type(prune_method)
                     new_features.append(
-                        NewConv(in_channels=layer.in_channels,
+                        conv_type(in_channels=layer.in_channels,
                                 out_channels=layer.out_channels,
                                 kernel_size=layer.kernel_size,
                                 stride=layer.stride,
@@ -276,4 +276,23 @@ def make_dscnn(net, config={}):
 
     net.features = nn.Sequential(*new_features)
 
+    return net
+
+def vgg19_dscnn(config):
+
+    net = VGG19(config)
+    net = make_dscnn(net)
+    return net
+
+
+def mnist_sparse_cnn(config):
+
+    net = MNISTSparseCNN()
+    return net
+
+
+def mnist_sparse_dscnn(config):
+
+    net = MNISTSparseCNN()
+    net = make_dscnn(net, config)
     return net

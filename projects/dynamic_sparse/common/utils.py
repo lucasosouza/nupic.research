@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 import os
+from copy import deepcopy
 
 import ray
 from ray import tune
@@ -30,10 +31,12 @@ from torchvision import datasets, transforms
 
 import dynamic_sparse.models as models
 import dynamic_sparse.networks as networks
-from .datasets import PreprocessedSpeechDataLoader, VaryingDataLoader
+from .dataloaders import PreprocessedSpeechDataLoader, VaryingDataLoader
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
 
 from torchsummary import summary
+from collections.abc import Iterable
+
 
 class Dataset:
     """Loads a dataset.
@@ -92,6 +95,12 @@ class Dataset:
 
     def load_from_torch_vision(self):
   
+        # special dataloader case
+        if isinstance(self.batch_size_train, Iterable) or isinstance(self.batch_size_test, Iterable):
+            dataloader_type = VaryingDataLoader
+        else:
+            dataloader_type = DataLoader
+
         # expand ~
         self.data_dir = os.path.expanduser(self.data_dir)
 
@@ -128,7 +137,7 @@ class Dataset:
         train_set = getattr(datasets, self.dataset_name)(
             root=self.data_dir, train=True, transform=aug_transform
         )
-        self.train_loader = DataLoader(
+        self.train_loader = dataloader_type(
             dataset=train_set, batch_size=self.batch_size_train, shuffle=True
         )
 
@@ -136,7 +145,7 @@ class Dataset:
         test_set = getattr(datasets, self.dataset_name)(
             root=self.data_dir, train=False, transform=transform
         )
-        self.test_loader = DataLoader(
+        self.test_loader = dataloader_type(
             dataset=test_set, batch_size=self.batch_size_test, shuffle=False
         )
 
@@ -155,7 +164,7 @@ class Dataset:
             noise_set = getattr(datasets, self.dataset_name)(
                 root=self.data_dir, train=False, transform=noise_transform
             )
-            self.noise_loader = DataLoader(
+            self.noise_loader = dataloader_type(
                 dataset=noise_set, batch_size=self.batch_size_test, shuffle=False
             )
 
@@ -186,36 +195,36 @@ class Trainable(tune.Trainable):
 
 def download_dataset(config):
     """Pre-downloads dataset.
-
     Required to avoid multiple simultaneous attempts to download same
     dataset
     """
-    getattr(datasets, config["dataset_name"])(
-        download=True, root=os.path.expanduser(config["data_dir"])
-    )
-
+    dataset_name = config["dataset_name"]
+    if hasattr(datasets, dataset_name):
+        getattr(datasets, config["dataset_name"])(
+            download=True, root=os.path.expanduser(config["data_dir"])
+        )
 
 def new_experiment(base_config, new_config):
-    modified_config = base_config.copy()
+    modified_config = deepcopy(base_config)
     modified_config.update(new_config)
     return modified_config
 
 
-@ray.remote
-def run_experiment(name, trainable, exp_config, tune_config):
+# @ray.remote
+# def run_experiment(name, trainable, exp_config, tune_config):
 
-    # override when running local for test
-    # if not torch.cuda.is_available():
-    #     exp_config["device"] = "cpu"
-    #     tune_config["resources_per_trial"] = {"cpu": 1}
+#     # override when running local for test
+#     # if not torch.cuda.is_available():
+#     #     exp_config["device"] = "cpu"
+#     #     tune_config["resources_per_trial"] = {"cpu": 1}
 
-    # download dataset
-    download_dataset(exp_config)
+#     # download dataset
+#     download_dataset(exp_config)
 
-    # run
-    tune_config["name"] = name
-    tune_config["config"] = exp_config
-    tune.run(Trainable, **tune_config)
+#     # run
+#     tune_config["name"] = name
+#     tune_config["config"] = exp_config
+#     tune.run(Trainable, **tune_config)
 
 
 def init_ray():
@@ -241,101 +250,42 @@ def init_ray():
             t, serializer=serializer, deserializer=deserializer)
 
 
-##### old Dataset
+def run_ray(tune_config, exp_config, fix_seed=False):
 
-# class Dataset:
-#     """Loads a dataset.
+    # update config
+    tune_config["config"] = exp_config
+    download_dataset(exp_config)
 
-#     Returns object with a pytorch train and test loader
-#     """
+    # override when running local for test
+    if not torch.cuda.is_available():
+        tune_config["config"]["device"] = "cpu"
+        tune_config["resources_per_trial"] = {"cpu": 1}
 
-#     def __init__(self, config=None):
+    # init ray
+    ray.init(load_code_from_local=True)
 
-#         defaults = dict(
-#             dataset_name=None,
-#             data_dir=None,
-#             batch_size_train=128,
-#             batch_size_test=128,
-#             stats_mean=None,
-#             stats_std=None,
-#             augment_images=False,
-#             test_noise=False,
-#             noise_level=0.1,
-#             varying=True
-#         )
-#         defaults.update(config)
-#         self.__dict__.update(defaults)
+    # MC code to fix for an unknown bug
+    def serializer(obj):
+        if obj.is_cuda:
+            return obj.cpu().numpy()
+        else:
+            return obj.numpy()
 
-#         # added check for varying
-#         if self.varying:
-#             loader_class = DataLoader
-#         else:
-#             loader_class = VaryingDataLoader
 
-#         # expand ~
-#         self.data_dir = os.path.expanduser(self.data_dir)
+    def deserializer(serialized_obj):
+        return serialized_obj
 
-#         # recover mean and std to normalize dataset
-#         if not self.stats_mean or not self.stats_std:
-#             tempset = getattr(datasets, self.dataset_name)(
-#                 root=self.data_dir, train=True, transform=transforms.ToTensor()
-#             )
-#             self.stats_mean = (tempset.data.float().mean().item() / 255,)
-#             self.stats_std = (tempset.data.float().std().item() / 255,)
-#             del tempset
+    for t in [
+            torch.FloatTensor, torch.DoubleTensor, torch.HalfTensor,
+            torch.ByteTensor, torch.CharTensor, torch.ShortTensor,
+            torch.IntTensor, torch.LongTensor, torch.Tensor
+        ]:
+        ray.register_custom_serializer(
+            t, serializer=serializer, deserializer=deserializer)
 
-#         # set up transformations
-#         transform = transforms.Compose(
-#             [
-#                 transforms.ToTensor(),
-#                 transforms.Normalize(self.stats_mean, self.stats_std),
-#             ]
-#         )
-#         # set up augment transforms for training
-#         if not self.augment_images:
-#             aug_transform = transform
-#         else:
-#             aug_transform = transforms.Compose(
-#                 [
-#                     transforms.RandomCrop(32, padding=4),
-#                     transforms.RandomHorizontalFlip(),
-#                     transforms.ToTensor(),
-#                     transforms.Normalize(self.stats_mean, self.stats_std),
-#                 ]
-#             )
+    # fix seed
+    if fix_seed:
+        torch.manual_seed(32)
 
-#         # load train set
-#         train_set = getattr(datasets, self.dataset_name)(
-#             root=self.data_dir, train=True, transform=aug_transform
-#         )
-#         self.train_loader = loader_class(
-#             dataset=train_set, batch_size=self.batch_size_train, shuffle=True
-#         )
 
-#         # load test set
-#         test_set = getattr(datasets, self.dataset_name)(
-#             root=self.data_dir, train=False, transform=transform
-#         )
-#         self.test_loader = loader_class(
-#             dataset=test_set, batch_size=self.batch_size_test, shuffle=False
-#         )
-
-#         # noise dataset
-#         if self.test_noise:
-#             noise = self.noise_level
-#             noise_transform = transforms.Compose(
-#                 [
-#                     transforms.ToTensor(),
-#                     transforms.Normalize(self.stats_mean, self.stats_std),
-#                     RandomNoise(
-#                         noise, high_value=0.5 + 2 * 0.20, low_value=0.5 - 2 * 0.2
-#                     ),
-#                 ]
-#             )
-#             noise_set = getattr(datasets, self.dataset_name)(
-#                 root=self.data_dir, train=False, transform=noise_transform
-#             )
-#             self.noise_loader = loader_class(
-#                 dataset=noise_set, batch_size=self.batch_size_test, shuffle=False
-#             )
-
+    tune.run(Trainable, **tune_config)
