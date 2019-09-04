@@ -3,7 +3,9 @@ Introduction
 
 This repository contains the code for experiments on dynamic sparse neural networks.
 
-To get started, do `python runs/run_test.py`
+TO FIX: Ray doesn't read relative paths or local modules. For now the solution to run Ray is
+
+`PYTHONPATH=~/nta/nupic.research/projects/ python run_test.py`
 
 
 Overview
