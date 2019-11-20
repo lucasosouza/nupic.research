@@ -31,13 +31,12 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as schedulers
 
+from apex import amp
 from nupic.research.frameworks.dynamic_sparse.networks import NumScheduler
 from nupic.torch.modules import update_boost_strength
 
 from .loggers import BaseLogger, SparseLogger
 from .modules import SparseModule
-
-from apex import amp
 
 __all__ = ["BaseModel", "SparseModel"]
 
@@ -113,17 +112,18 @@ class BaseModel:
         self.logger = BaseLogger(self, config=self.config)
 
         # initializes mixed precision
-        # needs to be on cuda, 
-        self.network.to(self.device) 
+        # needs to be on cuda,
+        self.network.to(self.device)
         if self.train_mixed_precision:
             print("Using mixed precision during training")
             self.network, self.optimizer = amp.initialize(
-                self.network, self.optimizer, opt_level="O1")
+                self.network, self.optimizer, opt_level="O1"
+            )
 
         # adds option of data parallelism
         if self.use_multiple_gpus:
             self.network = nn.DataParallel(self.network)
-        self.network.to(self.device)            
+        self.network.to(self.device)
 
     def run_epoch(self, dataset, epoch, test_noise_local=False):
         self.current_epoch = epoch + 1
