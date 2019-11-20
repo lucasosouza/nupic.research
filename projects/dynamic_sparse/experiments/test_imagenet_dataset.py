@@ -27,12 +27,13 @@ base_exp_config = dict(
     device="cuda",
     dataset_name="ImageNet",
     use_multiple_gpus=True,
+    train_mixed_precision=True,
     model="PruningModel",
     data_dir="~/nta/datasets",
     num_classes=1000,
     epochs=20,
-    batch_size_train=1024,
-    batch_size_test=1024,  # 5120,
+    batch_size_train=2048,
+    batch_size_test=2048,
     # ---- network related
     network="resnet50",
     pretrained=True,
@@ -53,7 +54,7 @@ tune_config = dict(
     name=__file__.replace(".py", ""),
     checkpoint_freq=0,
     checkpoint_at_end=True,
-    resources_per_trial={"cpu": 60, "gpu": 8},
+    resources_per_trial={"cpu": 63, "gpu": 8},
     verbose=2,
 )
 

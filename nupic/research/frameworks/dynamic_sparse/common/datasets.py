@@ -221,14 +221,14 @@ class ImageNetDataset(BaseDataset):
             shuffle=True,
             batch_size=self.batch_size_train,
             pin_memory=True,
-            num_workers=56,
+            num_workers=64,
         )
         self.test_loader = DataLoader(
             test_dataset,
             shuffle=False,
             batch_size=self.batch_size_test,
             pin_memory=True,
-            num_workers=56,
+            num_workers=64,
         )
 
 

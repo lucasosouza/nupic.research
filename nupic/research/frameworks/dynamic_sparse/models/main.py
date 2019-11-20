@@ -37,6 +37,8 @@ from nupic.torch.modules import update_boost_strength
 from .loggers import BaseLogger, SparseLogger
 from .modules import SparseModule
 
+from apex import amp
+
 __all__ = ["BaseModel", "SparseModel"]
 
 
@@ -59,6 +61,7 @@ class BaseModel:
             test_noise=False,
             weight_decay=1e-4,
             use_multiple_gpus=False,
+            train_mixed_precision=False,
             train_batches_per_epoch=np.inf,  # default - don't limit the batches
         )
         defaults.update(config or {})
@@ -67,10 +70,8 @@ class BaseModel:
         # save config to restore the model later
         self.config = config
         self.device = torch.device(self.device)
-        if self.use_multiple_gpus:
-            network = nn.DataParallel(network)
-        self.network = network.to(self.device)
         self.config = deepcopy(config)
+        self.network = network
 
     def setup(self, config=None):
 
@@ -110,6 +111,19 @@ class BaseModel:
         self._make_attr_schedulable("train_batches_per_epoch")
 
         self.logger = BaseLogger(self, config=self.config)
+
+        # initializes mixed precision
+        # needs to be on cuda, 
+        self.network.to(self.device) 
+        if self.train_mixed_precision:
+            print("Using mixed precision during training")
+            self.network, self.optimizer = amp.initialize(
+                self.network, self.optimizer, opt_level="O1")
+
+        # adds option of data parallelism
+        if self.use_multiple_gpus:
+            self.network = nn.DataParallel(self.network)
+        self.network.to(self.device)            
 
     def run_epoch(self, dataset, epoch, test_noise_local=False):
         self.current_epoch = epoch + 1
@@ -177,7 +191,12 @@ class BaseModel:
                 correct += torch.sum(targets == preds).item()
                 loss = self.loss_func(outputs, targets)
                 if train:
-                    loss.backward()
+                    # adds support to mixed precision
+                    if self.train_mixed_precision:
+                        with amp.scale_loss(loss, self.optimizer) as scaled_loss:
+                            scaled_loss.backward()
+                    else:
+                        loss.backward()
                     self.optimizer.step()
                     self._post_optimize_updates()
 
