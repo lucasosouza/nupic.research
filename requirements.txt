@@ -25,8 +25,7 @@ nupic.tensorflow @ git+https://github.com/numenta/nupic.tensorflow.git
 
 # Install apex for mixed precision
 
--e git://github.com/NVIDIA/apex.git@37cdaf4ad57ab4e7dd9ef13dbed7b29aa939d061#egg=apex
-
+apex @ git+https://github.com/NVIDIA/apex.git@37cdaf4ad57ab4e7dd9ef13dbed7b29aa939d061
 awscli
 boto3
 elasticsearch
